@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NCard, NButton, NProgress, NStatistic } from 'naive-ui'
+import { NButton, NProgress } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
@@ -7,7 +7,6 @@ definePageMeta({
 
 const auth = useAuth()
 
-// Mock data for demo - will be replaced with real data from Supabase
 const stats = ref({
   workoutsThisWeek: 4,
   totalWorkouts: 127,
@@ -45,10 +44,10 @@ const recentWorkouts = ref([
 ])
 
 const quickActions = [
-  { label: 'Push', icon: 'chest', color: 'from-accent-500 to-energy-500' },
-  { label: 'Pull', icon: 'back', color: 'from-secondary-500 to-primary-500' },
-  { label: 'Legs', icon: 'legs', color: 'from-success-500 to-secondary-500' },
-  { label: 'Custom', icon: 'plus', color: 'from-primary-500 to-accent-500' },
+  { label: 'Push', icon: 'chest' },
+  { label: 'Pull', icon: 'back' },
+  { label: 'Legs', icon: 'legs' },
+  { label: 'Custom', icon: 'plus' },
 ]
 
 function formatDuration(minutes: number) {
@@ -87,16 +86,15 @@ function formatDate(dateStr: string) {
     <!-- Welcome Section -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-bold">
-          <span class="gradient-text">Welcome back,</span>
-          <span class="text-gray-900 dark:text-white">{{ auth.profile.value?.display_name || auth.profile.value?.username || 'Athlete' }}!</span>
+        <h1 class="text-2xl font-bold text-primary-900 dark:text-white">
+          Welcome back, {{ auth.profile.value?.display_name || auth.profile.value?.username || 'Athlete' }}
         </h1>
         <p class="text-gray-500 dark:text-gray-400 mt-1">
           Ready to crush your workout today?
         </p>
       </div>
       <NuxtLink to="/workout/new">
-        <NButton type="primary" size="large" class="btn-glow">
+        <NButton type="primary" size="large" class="!rounded-full !px-6">
           <template #icon>
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -110,44 +108,37 @@ function formatDate(dateStr: string) {
     <!-- Stats Grid -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Workouts This Week -->
-      <NCard class="!bg-gradient-to-br from-primary-500 via-accent-500 to-secondary-500 stat-card shadow-xl glow-primary">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">This Week</p>
-          <p class="text-3xl font-bold mt-1">{{ stats.workoutsThisWeek }}</p>
-          <p class="text-white/60 text-sm mt-2">workouts</p>
-        </div>
-      </NCard>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">This Week</p>
+        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }}</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">workouts</p>
+      </div>
 
       <!-- Current Streak -->
-      <NCard class="!bg-gradient-to-br from-energy-500 to-accent-500 stat-card shadow-xl">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">Current Streak</p>
-          <p class="text-3xl font-bold mt-1">{{ stats.currentStreak }}</p>
-          <p class="text-white/60 text-sm mt-2">days</p>
-        </div>
-      </NCard>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Current Streak</p>
+        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ stats.currentStreak }}</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">days</p>
+      </div>
 
       <!-- Total Volume -->
-      <NCard class="!bg-gradient-to-br from-success-500 to-secondary-500 stat-card shadow-xl">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">Total Volume</p>
-          <p class="text-3xl font-bold mt-1">{{ formatVolume(stats.totalVolume) }}</p>
-          <p class="text-white/60 text-sm mt-2">this month</p>
-        </div>
-      </NCard>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Volume</p>
+        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ formatVolume(stats.totalVolume) }}</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this month</p>
+      </div>
 
       <!-- PRs This Month -->
-      <NCard class="!bg-gradient-to-br from-warning-500 to-energy-500 stat-card shadow-xl">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">New PRs</p>
-          <p class="text-3xl font-bold mt-1">{{ stats.prsThisMonth }}</p>
-          <p class="text-white/60 text-sm mt-2">this month</p>
-        </div>
-      </NCard>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">New PRs</p>
+        <p class="text-3xl font-bold text-accent-500">{{ stats.prsThisMonth }}</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this month</p>
+      </div>
     </div>
 
     <!-- Quick Start -->
-    <NCard title="Quick Start">
+    <div class="card p-6">
+      <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Quick Start</h2>
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <NuxtLink
           v-for="action in quickActions"
@@ -156,11 +147,10 @@ function formatDate(dateStr: string) {
           class="group"
         >
           <div
-            class="aspect-square rounded-2xl bg-gradient-to-br flex flex-col items-center justify-center transition-transform group-hover:scale-105"
-            :class="action.color"
+            class="aspect-square rounded-2xl bg-gray-50 dark:bg-[#222222] border border-gray-100 dark:border-gray-700 flex flex-col items-center justify-center transition-all group-hover:border-primary-900 dark:group-hover:border-white group-hover:bg-gray-100 dark:group-hover:bg-[#2a2a2a]"
           >
-            <div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center mb-2">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-12 h-12 rounded-full bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-600 flex items-center justify-center mb-3 group-hover:border-primary-900 dark:group-hover:border-white transition-colors">
+              <svg class="w-6 h-6 text-primary-900 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   v-if="action.icon === 'plus'"
                   stroke-linecap="round"
@@ -177,38 +167,39 @@ function formatDate(dateStr: string) {
                 />
               </svg>
             </div>
-            <span class="text-white font-semibold">{{ action.label }}</span>
+            <span class="text-primary-900 dark:text-white font-medium">{{ action.label }}</span>
           </div>
         </NuxtLink>
       </div>
-    </NCard>
+    </div>
 
     <!-- Recent Workouts -->
-    <NCard title="Recent Workouts">
-      <template #header-extra>
-        <NuxtLink to="/workout" class="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+    <div class="card p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Recent Workouts</h2>
+        <NuxtLink to="/workout" class="text-sm text-primary-900 dark:text-white font-medium hover:underline">
           View all
         </NuxtLink>
-      </template>
+      </div>
 
-      <div class="space-y-3">
+      <div class="space-y-2">
         <NuxtLink
           v-for="workout in recentWorkouts"
           :key="workout.id"
           :to="`/workout/${workout.id}`"
           class="block"
         >
-          <div class="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-all hover:shadow-md">
+          <div class="flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-[#222222] transition-colors">
             <!-- Icon -->
-            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center flex-shrink-0 shadow-md">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-12 h-12 rounded-xl bg-gray-100 dark:bg-[#2a2a2a] flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-primary-900 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h2m12 0h2M6 7v10M18 7v10M8 7h8M8 17h8M4 17h2m12 0h2" />
               </svg>
             </div>
 
             <!-- Info -->
             <div class="flex-1 min-w-0">
-              <h3 class="font-semibold text-gray-900 dark:text-white truncate">
+              <h3 class="font-semibold text-primary-900 dark:text-white truncate">
                 {{ workout.name }}
               </h3>
               <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -218,7 +209,7 @@ function formatDate(dateStr: string) {
 
             <!-- Stats -->
             <div class="text-right flex-shrink-0">
-              <p class="font-semibold text-gray-900 dark:text-white">
+              <p class="font-semibold text-primary-900 dark:text-white">
                 {{ formatDuration(workout.duration) }}
               </p>
               <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -227,7 +218,7 @@ function formatDate(dateStr: string) {
             </div>
 
             <!-- Arrow -->
-            <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 text-gray-300 dark:text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
             </svg>
           </div>
@@ -236,64 +227,66 @@ function formatDate(dateStr: string) {
 
       <!-- Empty State -->
       <div v-if="recentWorkouts.length === 0" class="text-center py-12">
-        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-[#222222] flex items-center justify-center">
           <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h2m12 0h2M6 7v10M18 7v10M8 7h8M8 17h8M4 17h2m12 0h2" />
           </svg>
         </div>
-        <h3 class="font-medium text-gray-900 dark:text-white mb-1">No workouts yet</h3>
+        <h3 class="font-medium text-primary-900 dark:text-white mb-1">No workouts yet</h3>
         <p class="text-gray-500 dark:text-gray-400 mb-4">Start your first workout to see it here.</p>
         <NuxtLink to="/workout/new">
-          <NButton type="primary">Start Workout</NButton>
+          <NButton type="primary" class="!rounded-full">Start Workout</NButton>
         </NuxtLink>
       </div>
-    </NCard>
+    </div>
 
-    <!-- Weekly Progress -->
+    <!-- Weekly Progress & AI Insight -->
     <div class="grid lg:grid-cols-2 gap-6">
       <!-- Weekly Goal -->
-      <NCard title="Weekly Goal">
+      <div class="card p-6">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Weekly Goal</h2>
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <span class="text-gray-600 dark:text-gray-400">Workouts completed</span>
-            <span class="font-semibold text-gray-900 dark:text-white">{{ stats.workoutsThisWeek }} / 5</span>
+            <span class="font-semibold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }} / 5</span>
           </div>
           <NProgress
             type="line"
             :percentage="(stats.workoutsThisWeek / 5) * 100"
-            :height="12"
-            :border-radius="6"
-            :fill-border-radius="6"
+            :height="8"
+            :border-radius="4"
+            :fill-border-radius="4"
             status="success"
           />
           <p class="text-sm text-gray-500 dark:text-gray-400">
             {{ 5 - stats.workoutsThisWeek > 0 ? `${5 - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
           </p>
         </div>
-      </NCard>
+      </div>
 
       <!-- AI Insight Preview -->
-      <NCard title="AI Insight">
-        <template #header-extra>
-          <NuxtLink to="/insights" class="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">AI Insight</h2>
+          <NuxtLink to="/insights" class="text-sm text-primary-900 dark:text-white font-medium hover:underline">
             View all
           </NuxtLink>
-        </template>
+        </div>
 
         <div class="flex gap-4">
-          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-primary-500 flex items-center justify-center flex-shrink-0 shadow-md">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-accent-600 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
           <div>
-            <h4 class="font-medium text-gray-900 dark:text-white mb-1">Great progress on bench press!</h4>
+            <h4 class="font-medium text-primary-900 dark:text-white mb-1">Great progress on bench press!</h4>
             <p class="text-sm text-gray-500 dark:text-gray-400">
               You've increased your bench press by 5kg over the last 4 weeks. Consider adding a deload week next week to optimize recovery.
             </p>
           </div>
         </div>
-      </NCard>
+      </div>
     </div>
   </div>
 </template>

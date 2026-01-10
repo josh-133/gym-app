@@ -2,135 +2,116 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom CSS variables for theming */
+/* Clean, minimal CSS variables */
 :root {
-  --color-primary: 168 85 247; /* Purple */
-  --color-accent: 236 72 153; /* Pink */
-  --color-secondary: 6 182 212; /* Cyan */
-  --color-success: 34 197 94; /* Green */
-  --color-warning: 245 158 11; /* Amber */
-  --color-energy: 249 115 22; /* Orange */
+  --color-bg: 255 255 255;
+  --color-surface: 249 250 251;
+  --color-text: 17 24 39;
+  --color-text-muted: 107 114 128;
+  --color-border: 229 231 235;
+  --color-accent: 239 68 68;
 }
 
-/* Dark mode support */
 .dark {
-  --color-background: 15 15 20;
-  --color-surface: 24 24 32;
-  --color-text: 243 244 246;
+  --color-bg: 17 17 17;
+  --color-surface: 26 26 26;
+  --color-text: 249 250 251;
+  --color-text-muted: 156 163 175;
+  --color-border: 55 55 55;
 }
 
 /* Base styles */
 body {
-  @apply antialiased bg-gray-50 text-gray-900 dark:bg-[#0f0f14] dark:text-gray-100;
+  @apply antialiased bg-white text-gray-900 dark:bg-[#111111] dark:text-gray-100;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-/* Smooth transitions */
-* {
-  @apply transition-colors duration-200;
+/* Minimal transitions - only where needed */
+a, button {
+  @apply transition-colors duration-150;
 }
 
-/* Custom scrollbar with gradient */
+/* Clean scrollbar */
 ::-webkit-scrollbar {
   @apply w-2;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-900;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gradient-to-b from-primary-400 to-accent-400 rounded-full;
+  @apply bg-gray-300 dark:bg-gray-700 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply from-primary-500 to-accent-500;
+  @apply bg-gray-400 dark:bg-gray-600;
 }
 
-/* Focus ring utility */
+/* Focus states */
 .focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
+  @apply focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
 }
 
-/* Gradient text utility */
-.gradient-text {
-  @apply bg-gradient-to-r from-primary-500 via-accent-500 to-secondary-500 bg-clip-text text-transparent;
+/* Clean button base */
+.btn {
+  @apply inline-flex items-center justify-center font-medium rounded-full transition-all duration-150;
 }
 
-/* Vibrant gradient backgrounds */
-.gradient-bg {
-  @apply bg-gradient-to-br from-primary-500 via-accent-500 to-secondary-500;
-  background-size: 200% 200%;
+.btn-primary {
+  @apply bg-primary-900 dark:bg-white text-white dark:text-primary-900 hover:bg-primary-800 dark:hover:bg-gray-100;
 }
 
-.gradient-bg-animated {
-  @apply bg-gradient-to-br from-primary-500 via-accent-500 to-secondary-500 animate-gradient;
-  background-size: 200% 200%;
+.btn-accent {
+  @apply bg-accent-500 text-white hover:bg-accent-600;
 }
 
-/* Glass morphism effect */
-.glass {
-  @apply bg-white/70 dark:bg-gray-800/70 backdrop-blur-lg border border-white/20 dark:border-gray-700/30;
+.btn-outline {
+  @apply border-2 border-primary-900 dark:border-white text-primary-900 dark:text-white hover:bg-primary-900 hover:text-white dark:hover:bg-white dark:hover:text-primary-900;
 }
 
-.glass-dark {
-  @apply bg-gray-900/80 backdrop-blur-lg border border-gray-700/30;
+/* Card styles - clean and minimal */
+.card {
+  @apply bg-white dark:bg-[#1a1a1a] rounded-2xl border border-gray-100 dark:border-gray-800;
 }
 
-/* Glow effects */
-.glow-primary {
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.3), 0 0 40px rgba(168, 85, 247, 0.1);
+.card-elevated {
+  @apply bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-200;
 }
 
-.glow-accent {
-  box-shadow: 0 0 20px rgba(236, 72, 153, 0.3), 0 0 40px rgba(236, 72, 153, 0.1);
-}
-
-.glow-success {
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.3), 0 0 40px rgba(34, 197, 94, 0.1);
-}
-
-/* Stat card hover effect */
+/* Stat card - subtle background */
 .stat-card {
-  @apply relative overflow-hidden;
+  @apply bg-gray-50 dark:bg-[#1a1a1a] rounded-2xl p-5 border border-gray-100 dark:border-gray-800;
 }
 
-.stat-card::before {
-  content: '';
-  @apply absolute inset-0 opacity-0 transition-opacity duration-300;
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1), rgba(236, 72, 153, 0.1));
+/* Tag/Badge styles - pill shaped */
+.tag {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
 }
 
-.stat-card:hover::before {
-  @apply opacity-100;
+.tag-default {
+  @apply bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300;
 }
 
-/* Button glow on hover */
-.btn-glow:hover {
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.5), 0 0 40px rgba(236, 72, 153, 0.3);
+.tag-accent {
+  @apply bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400;
 }
 
-/* Mesh gradient background for special sections */
-.mesh-bg {
-  background-color: #0f0f14;
-  background-image:
-    radial-gradient(at 40% 20%, rgba(168, 85, 247, 0.3) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, rgba(236, 72, 153, 0.2) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, rgba(6, 182, 212, 0.2) 0px, transparent 50%),
-    radial-gradient(at 80% 50%, rgba(249, 115, 22, 0.15) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(168, 85, 247, 0.2) 0px, transparent 50%);
+.tag-success {
+  @apply bg-success-50 dark:bg-success-900/30 text-success-600 dark:text-success-400;
 }
 
-/* Light mode mesh */
-.mesh-bg-light {
-  background-color: #faf5ff;
-  background-image:
-    radial-gradient(at 40% 20%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, rgba(236, 72, 153, 0.1) 0px, transparent 50%),
-    radial-gradient(at 0% 50%, rgba(6, 182, 212, 0.1) 0px, transparent 50%);
+/* Section header */
+.section-header {
+  @apply text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4;
 }
 
-/* PR badge styling */
-.pr-badge {
-  @apply bg-gradient-to-r from-warning-400 to-energy-500 text-white font-bold px-2 py-0.5 rounded-full text-xs;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+/* List item hover */
+.list-item {
+  @apply p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer;
+}
+
+/* Input styles */
+.input {
+  @apply w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-primary-900 dark:focus:border-white focus:ring-1 focus:ring-primary-900/20 dark:focus:ring-white/20;
 }

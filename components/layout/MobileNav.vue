@@ -21,22 +21,22 @@ function isActive(path: string) {
 </script>
 
 <template>
-  <nav class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-2 pb-safe">
+  <nav class="bg-white dark:bg-[#111111] border-t border-gray-100 dark:border-gray-800 px-2 pb-safe">
     <ul class="flex justify-around py-2">
       <li v-for="item in navItems" :key="item.to">
         <NuxtLink
           :to="item.to"
-          class="flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px]"
+          class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[60px]"
           :class="[
             isActive(item.to)
-              ? 'text-indigo-600 dark:text-indigo-400'
-              : 'text-gray-500 dark:text-gray-400'
+              ? 'text-primary-900 dark:text-white'
+              : 'text-gray-400 dark:text-gray-500'
           ]"
         >
           <!-- Special styling for "New" button -->
           <template v-if="item.icon === 'plus'">
-            <div class="w-12 h-12 -mt-6 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-12 h-12 -mt-6 rounded-full bg-primary-900 dark:bg-white flex items-center justify-center shadow-lg">
+              <svg class="w-6 h-6 text-white dark:text-primary-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>
             </div>

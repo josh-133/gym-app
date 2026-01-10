@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { NCard, NSelect, NTag } from 'naive-ui'
+import { NSelect } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
 })
 
-// Time range filter
 const timeRange = ref('3months')
 const timeRangeOptions = [
   { label: 'Last 30 Days', value: '30days' },
@@ -15,7 +14,6 @@ const timeRangeOptions = [
   { label: 'All Time', value: 'all' },
 ]
 
-// Selected exercise for detailed view
 const selectedExercise = ref('bench-press')
 const exerciseOptions = [
   { label: 'Bench Press', value: 'bench-press' },
@@ -25,7 +23,6 @@ const exerciseOptions = [
   { label: 'Barbell Row', value: 'row' },
 ]
 
-// Mock exercise progress data for each exercise
 const exerciseProgressData: Record<string, Array<{ date: string; weight: number; reps: number; estimated1RM: number }>> = {
   'bench-press': [
     { date: '2024-01-02', weight: 80, reps: 8, estimated1RM: 98 },
@@ -87,32 +84,27 @@ const exerciseProgressData: Record<string, Array<{ date: string; weight: number;
   ],
 }
 
-// Get exercise progress based on selected exercise
 const exerciseProgress = computed(() => {
   return exerciseProgressData[selectedExercise.value] || exerciseProgressData['bench-press']
 })
 
-// Mock volume by muscle group data
 const muscleVolumeData = ref([
-  { muscle: 'Chest', volume: 28500, sessions: 12, color: 'from-accent-500 to-energy-500' },
-  { muscle: 'Back', volume: 32200, sessions: 14, color: 'from-secondary-500 to-primary-500' },
-  { muscle: 'Shoulders', volume: 18800, sessions: 10, color: 'from-primary-500 to-accent-500' },
-  { muscle: 'Legs', volume: 45600, sessions: 8, color: 'from-success-500 to-secondary-500' },
-  { muscle: 'Biceps', volume: 8200, sessions: 8, color: 'from-warning-500 to-energy-500' },
-  { muscle: 'Triceps', volume: 9100, sessions: 9, color: 'from-energy-500 to-accent-500' },
+  { muscle: 'Chest', volume: 28500, sessions: 12 },
+  { muscle: 'Back', volume: 32200, sessions: 14 },
+  { muscle: 'Shoulders', volume: 18800, sessions: 10 },
+  { muscle: 'Legs', volume: 45600, sessions: 8 },
+  { muscle: 'Biceps', volume: 8200, sessions: 8 },
+  { muscle: 'Triceps', volume: 9100, sessions: 9 },
 ])
 
-// Mock PR timeline
 const prTimeline = ref([
   { exercise: 'Bench Press', weight: 100, reps: 5, date: '2024-02-06', improvement: '+2.5kg' },
   { exercise: 'Squat', weight: 140, reps: 5, date: '2024-02-04', improvement: '+5kg' },
   { exercise: 'Deadlift', weight: 180, reps: 3, date: '2024-02-01', improvement: '+5kg' },
   { exercise: 'Overhead Press', weight: 60, reps: 6, date: '2024-01-28', improvement: '+2.5kg' },
   { exercise: 'Barbell Row', weight: 85, reps: 8, date: '2024-01-25', improvement: '+5kg' },
-  { exercise: 'Bench Press', weight: 97.5, reps: 5, date: '2024-01-20', improvement: '+2.5kg' },
 ])
 
-// Weekly volume trend
 const weeklyVolumeTrend = ref([
   { week: 'Week 1', push: 8500, pull: 9200, legs: 11500 },
   { week: 'Week 2', push: 9100, pull: 8800, legs: 10200 },
@@ -120,7 +112,6 @@ const weeklyVolumeTrend = ref([
   { week: 'Week 4', push: 9600, pull: 10100, legs: 11800 },
 ])
 
-// Computed stats based on selected exercise
 const maxWeight = computed(() => Math.max(...exerciseProgress.value.map(p => p.weight)))
 const minWeight = computed(() => Math.min(...exerciseProgress.value.map(p => p.weight)))
 const maxEstimated1RM = computed(() => Math.max(...exerciseProgress.value.map(p => p.estimated1RM)))
@@ -131,7 +122,7 @@ const sessionCount = computed(() => exerciseProgress.value.length)
 const selectedExerciseLabel = computed(() => exerciseOptions.find(e => e.value === selectedExercise.value)?.label || 'Exercise')
 const lastReps = computed(() => exerciseProgress.value[exerciseProgress.value.length - 1]?.reps || 0)
 const totalVolume = computed(() => muscleVolumeData.value.reduce((sum, m) => sum + m.volume, 0))
-const totalPRs = computed(() => prTimeline.value.length)
+const maxMuscleVolume = computed(() => Math.max(...muscleVolumeData.value.map(m => m.volume)))
 
 function formatVolume(kg: number) {
   if (kg >= 1000) {
@@ -154,69 +145,63 @@ function getProgressPercentage(value: number, max: number) {
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <NuxtLink to="/progress" class="text-sm text-primary-600 dark:text-primary-400 hover:underline mb-2 inline-block">
-          ← Back to Progress
+        <NuxtLink to="/progress" class="text-sm text-gray-500 dark:text-gray-400 hover:text-primary-900 dark:hover:text-white mb-2 inline-flex items-center gap-1">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Progress
         </NuxtLink>
-        <h1 class="text-2xl font-bold gradient-text">Strength Analytics</h1>
+        <h1 class="text-2xl font-bold text-primary-900 dark:text-white">Strength Analytics</h1>
         <p class="text-gray-500 dark:text-gray-400 mt-1">Track your strength gains over time</p>
       </div>
       <NSelect
         v-model:value="timeRange"
         :options="timeRangeOptions"
         style="width: 160px"
+        class="!rounded-xl"
       />
     </div>
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <NCard class="!bg-gradient-to-br from-primary-500 to-accent-500 shadow-xl">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">Total Volume</p>
-          <p class="text-3xl font-bold mt-1">{{ formatVolume(totalVolume) }}kg</p>
-          <p class="text-white/60 text-sm mt-2">this period</p>
-        </div>
-      </NCard>
-      <NCard class="!bg-gradient-to-br from-warning-500 to-energy-500 shadow-xl">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">New PRs</p>
-          <p class="text-3xl font-bold mt-1">{{ totalPRs }}</p>
-          <p class="text-white/60 text-sm mt-2">personal records</p>
-        </div>
-      </NCard>
-      <NCard class="!bg-gradient-to-br from-success-500 to-secondary-500 shadow-xl">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">Best {{ selectedExerciseLabel }}</p>
-          <p class="text-3xl font-bold mt-1">{{ maxWeight }}kg</p>
-          <p class="text-white/60 text-sm mt-2">× {{ lastReps }} reps</p>
-        </div>
-      </NCard>
-      <NCard class="!bg-gradient-to-br from-secondary-500 to-primary-500 shadow-xl">
-        <div class="text-white">
-          <p class="text-white/80 text-sm">Est. 1RM</p>
-          <p class="text-3xl font-bold mt-1">{{ maxEstimated1RM }}kg</p>
-          <p class="text-white/60 text-sm mt-2">{{ selectedExerciseLabel.toLowerCase() }}</p>
-        </div>
-      </NCard>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Volume</p>
+        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ formatVolume(totalVolume) }}kg</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this period</p>
+      </div>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">New PRs</p>
+        <p class="text-3xl font-bold text-accent-500">{{ prTimeline.length }}</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">personal records</p>
+      </div>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Best {{ selectedExerciseLabel }}</p>
+        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxWeight }}kg</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">x {{ lastReps }} reps</p>
+      </div>
+      <div class="stat-card">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Est. 1RM</p>
+        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxEstimated1RM }}kg</p>
+        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">{{ selectedExerciseLabel.toLowerCase() }}</p>
+      </div>
     </div>
 
     <!-- Exercise Progress Chart -->
-    <NCard>
-      <template #header>
-        <div class="flex items-center justify-between">
-          <h3 class="font-semibold text-gray-900 dark:text-white">Exercise Progress</h3>
-          <NSelect
-            v-model:value="selectedExercise"
-            :options="exerciseOptions"
-            style="width: 160px"
-            size="small"
-          />
-        </div>
-      </template>
+    <div class="card p-6">
+      <div class="flex items-center justify-between mb-6">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Exercise Progress</h3>
+        <NSelect
+          v-model:value="selectedExercise"
+          :options="exerciseOptions"
+          style="width: 160px"
+          size="small"
+        />
+      </div>
 
       <!-- Chart Area -->
       <div class="relative">
         <!-- Y-axis labels -->
-        <div class="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-500 dark:text-gray-400">
+        <div class="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-400 dark:text-gray-500">
           <span>{{ maxWeight + 10 }}kg</span>
           <span>{{ Math.round((maxWeight + 10) * 0.75) }}kg</span>
           <span>{{ Math.round((maxWeight + 10) * 0.5) }}kg</span>
@@ -237,54 +222,46 @@ function getProgressPercentage(value: number, max: number) {
 
           <!-- Data points and line -->
           <svg class="absolute inset-0 w-full h-full overflow-visible">
-            <!-- Gradient fill -->
             <defs>
-              <linearGradient id="progressGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style="stop-color: rgb(168, 85, 247); stop-opacity: 0.3" />
-                <stop offset="100%" style="stop-color: rgb(168, 85, 247); stop-opacity: 0" />
+              <linearGradient id="progressFill" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color: rgb(239, 68, 68); stop-opacity: 0.15" />
+                <stop offset="100%" style="stop-color: rgb(239, 68, 68); stop-opacity: 0" />
               </linearGradient>
             </defs>
 
             <!-- Area fill -->
             <path
               :d="`M ${exerciseProgress.map((p, i) => `${(i / (exerciseProgress.length - 1)) * 100}%,${100 - getProgressPercentage(p.weight, maxWeight + 10)}%`).join(' L ')} L 100%,100% L 0%,100% Z`"
-              fill="url(#progressGradient)"
+              fill="url(#progressFill)"
             />
 
             <!-- Line -->
             <polyline
               :points="exerciseProgress.map((p, i) => `${(i / (exerciseProgress.length - 1)) * 100}%,${100 - getProgressPercentage(p.weight, maxWeight + 10)}%`).join(' ')"
               fill="none"
-              stroke="url(#lineGradient)"
-              stroke-width="3"
+              stroke="#ef4444"
+              stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
             />
-            <defs>
-              <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" style="stop-color: rgb(168, 85, 247)" />
-                <stop offset="50%" style="stop-color: rgb(236, 72, 153)" />
-                <stop offset="100%" style="stop-color: rgb(6, 182, 212)" />
-              </linearGradient>
-            </defs>
 
             <!-- Data points -->
             <g v-for="(point, i) in exerciseProgress" :key="i">
               <circle
                 :cx="`${(i / (exerciseProgress.length - 1)) * 100}%`"
                 :cy="`${100 - getProgressPercentage(point.weight, maxWeight + 10)}%`"
-                r="6"
+                r="4"
                 fill="white"
-                stroke="rgb(168, 85, 247)"
+                stroke="#ef4444"
                 stroke-width="2"
-                class="hover:r-8 transition-all cursor-pointer"
+                class="hover:r-6 cursor-pointer"
               />
             </g>
           </svg>
         </div>
 
         <!-- X-axis labels -->
-        <div class="ml-14 flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+        <div class="ml-14 flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-2">
           <span v-for="(point, i) in exerciseProgress.filter((_, idx) => idx % 2 === 0)" :key="i">
             {{ formatDate(point.date) }}
           </span>
@@ -292,9 +269,9 @@ function getProgressPercentage(value: number, max: number) {
       </div>
 
       <!-- Stats row -->
-      <div class="grid grid-cols-3 gap-4 mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
+      <div class="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
         <div class="text-center">
-          <p class="text-2xl font-bold text-gray-900 dark:text-white">+{{ weightIncrease }}kg</p>
+          <p class="text-2xl font-bold text-primary-900 dark:text-white">+{{ weightIncrease }}kg</p>
           <p class="text-sm text-gray-500 dark:text-gray-400">Weight Increase</p>
         </div>
         <div class="text-center">
@@ -302,108 +279,71 @@ function getProgressPercentage(value: number, max: number) {
           <p class="text-sm text-gray-500 dark:text-gray-400">Est. 1RM Gain</p>
         </div>
         <div class="text-center">
-          <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ sessionCount }}</p>
+          <p class="text-2xl font-bold text-primary-900 dark:text-white">{{ sessionCount }}</p>
           <p class="text-sm text-gray-500 dark:text-gray-400">Sessions</p>
         </div>
       </div>
-    </NCard>
+    </div>
 
     <div class="grid lg:grid-cols-2 gap-6">
       <!-- Volume by Muscle Group -->
-      <NCard title="Volume by Muscle Group">
-        <div class="space-y-4">
-          <div
-            v-for="muscle in muscleVolumeData"
-            :key="muscle.muscle"
-            class="group"
-          >
+      <div class="card p-6">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">Volume by Muscle Group</h3>
+        <div class="space-y-5">
+          <div v-for="muscle in muscleVolumeData" :key="muscle.muscle">
             <div class="flex items-center justify-between mb-2">
-              <span class="font-medium text-gray-900 dark:text-white">{{ muscle.muscle }}</span>
-              <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatVolume(muscle.volume) }}kg · {{ muscle.sessions }} sessions</span>
+              <span class="font-medium text-primary-900 dark:text-white">{{ muscle.muscle }}</span>
+              <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatVolume(muscle.volume) }}kg</span>
             </div>
-            <div class="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div class="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
               <div
-                class="h-full rounded-full transition-all duration-500 bg-gradient-to-r"
-                :class="muscle.color"
-                :style="{ width: `${(muscle.volume / 50000) * 100}%` }"
+                class="h-full rounded-full bg-primary-900 dark:bg-white transition-all duration-500"
+                :style="{ width: `${(muscle.volume / maxMuscleVolume) * 100}%` }"
               ></div>
             </div>
           </div>
         </div>
-
-        <!-- Pie chart representation -->
-        <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
-          <div class="flex items-center justify-center">
-            <div class="relative w-40 h-40">
-              <svg viewBox="0 0 100 100" class="transform -rotate-90">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="rgb(243 244 246)" stroke-width="20" class="dark:stroke-gray-800" />
-                <!-- Segments would be calculated in real app -->
-                <circle cx="50" cy="50" r="40" fill="none" stroke="url(#pieGradient1)" stroke-width="20"
-                  stroke-dasharray="50 251.2" stroke-dashoffset="0" />
-                <circle cx="50" cy="50" r="40" fill="none" stroke="url(#pieGradient2)" stroke-width="20"
-                  stroke-dasharray="45 251.2" stroke-dashoffset="-50" />
-                <circle cx="50" cy="50" r="40" fill="none" stroke="url(#pieGradient3)" stroke-width="20"
-                  stroke-dasharray="35 251.2" stroke-dashoffset="-95" />
-                <circle cx="50" cy="50" r="40" fill="none" stroke="url(#pieGradient4)" stroke-width="20"
-                  stroke-dasharray="70 251.2" stroke-dashoffset="-130" />
-                <circle cx="50" cy="50" r="40" fill="none" stroke="url(#pieGradient5)" stroke-width="20"
-                  stroke-dasharray="51.2 251.2" stroke-dashoffset="-200" />
-                <defs>
-                  <linearGradient id="pieGradient1"><stop stop-color="#ec4899"/></linearGradient>
-                  <linearGradient id="pieGradient2"><stop stop-color="#06b6d4"/></linearGradient>
-                  <linearGradient id="pieGradient3"><stop stop-color="#a855f7"/></linearGradient>
-                  <linearGradient id="pieGradient4"><stop stop-color="#22c55e"/></linearGradient>
-                  <linearGradient id="pieGradient5"><stop stop-color="#f97316"/></linearGradient>
-                </defs>
-              </svg>
-              <div class="absolute inset-0 flex items-center justify-center">
-                <div class="text-center">
-                  <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatVolume(totalVolume) }}</p>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">Total kg</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </NCard>
+      </div>
 
       <!-- PR Timeline -->
-      <NCard title="PR Timeline">
-        <div class="space-y-4 max-h-96 overflow-y-auto">
+      <div class="card p-6">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">PR Timeline</h3>
+        <div class="space-y-3">
           <div
             v-for="(pr, index) in prTimeline"
             :key="index"
-            class="flex items-start gap-4 p-3 rounded-xl bg-gradient-to-r from-warning-50 to-energy-50 dark:from-warning-900/20 dark:to-energy-900/20 border border-warning-200 dark:border-warning-800/50"
+            class="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-[#222222] border border-gray-100 dark:border-gray-700"
           >
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-warning-500 to-energy-500 flex items-center justify-center flex-shrink-0 shadow-md">
-              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <div class="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5 text-accent-500" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <h4 class="font-semibold text-gray-900 dark:text-white">{{ pr.exercise }}</h4>
-                <NTag type="success" size="small">{{ pr.improvement }}</NTag>
+                <h4 class="font-semibold text-primary-900 dark:text-white">{{ pr.exercise }}</h4>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400 font-medium">{{ pr.improvement }}</span>
               </div>
-              <p class="text-lg font-bold text-warning-600 dark:text-warning-400">
-                {{ pr.weight }}kg × {{ pr.reps }} reps
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {{ pr.weight }}kg x {{ pr.reps }} reps · {{ formatDate(pr.date) }}
               </p>
-              <p class="text-sm text-gray-500 dark:text-gray-400">{{ formatDate(pr.date) }}</p>
             </div>
           </div>
         </div>
-      </NCard>
+      </div>
     </div>
 
     <!-- Weekly Volume Trend -->
-    <NCard title="Weekly Volume Trend">
-      <div class="flex gap-2 mb-4">
+    <div class="card p-6">
+      <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">Weekly Volume Trend</h3>
+
+      <div class="flex gap-6 mb-6">
         <div class="flex items-center gap-2">
           <div class="w-3 h-3 rounded-full bg-accent-500"></div>
           <span class="text-sm text-gray-600 dark:text-gray-400">Push</span>
         </div>
         <div class="flex items-center gap-2">
-          <div class="w-3 h-3 rounded-full bg-secondary-500"></div>
+          <div class="w-3 h-3 rounded-full bg-primary-400"></div>
           <span class="text-sm text-gray-600 dark:text-gray-400">Pull</span>
         </div>
         <div class="flex items-center gap-2">
@@ -412,28 +352,25 @@ function getProgressPercentage(value: number, max: number) {
         </div>
       </div>
 
-      <div class="grid grid-cols-4 gap-4">
+      <div class="grid grid-cols-4 gap-6">
         <div v-for="week in weeklyVolumeTrend" :key="week.week" class="text-center">
-          <div class="h-48 flex items-end justify-center gap-1">
+          <div class="h-40 flex items-end justify-center gap-2">
             <div
-              class="w-6 bg-gradient-to-t from-accent-500 to-accent-400 rounded-t-lg transition-all hover:opacity-80"
+              class="w-5 bg-accent-500 rounded-t transition-all"
               :style="{ height: `${(week.push / 15000) * 100}%` }"
-              :title="`Push: ${formatVolume(week.push)}kg`"
             ></div>
             <div
-              class="w-6 bg-gradient-to-t from-secondary-500 to-secondary-400 rounded-t-lg transition-all hover:opacity-80"
+              class="w-5 bg-primary-400 rounded-t transition-all"
               :style="{ height: `${(week.pull / 15000) * 100}%` }"
-              :title="`Pull: ${formatVolume(week.pull)}kg`"
             ></div>
             <div
-              class="w-6 bg-gradient-to-t from-success-500 to-success-400 rounded-t-lg transition-all hover:opacity-80"
+              class="w-5 bg-success-500 rounded-t transition-all"
               :style="{ height: `${(week.legs / 15000) * 100}%` }"
-              :title="`Legs: ${formatVolume(week.legs)}kg`"
             ></div>
           </div>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">{{ week.week }}</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-3">{{ week.week }}</p>
         </div>
       </div>
-    </NCard>
+    </div>
   </div>
 </template>
