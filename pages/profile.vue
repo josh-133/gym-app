@@ -1,0 +1,217 @@
+<script setup lang="ts">
+import { NCard, NButton, NForm, NFormItem, NInput, NSelect, NAvatar, NTabs, NTabPane, NDivider, NSwitch } from 'naive-ui'
+
+definePageMeta({
+  middleware: ['auth'],
+})
+
+const auth = useAuth()
+const uiStore = useUIStore()
+
+// Profile form
+const displayName = ref(auth.profile.value?.display_name || '')
+const bio = ref(auth.profile.value?.bio || '')
+const fitnessGoal = ref(auth.profile.value?.fitness_goal || null)
+const experienceLevel = ref(auth.profile.value?.experience_level || null)
+const unitSystem = ref(auth.profile.value?.unit_system || 'metric')
+
+const saving = ref(false)
+
+const fitnessGoalOptions = [
+  { label: 'Build Muscle', value: 'build_muscle' },
+  { label: 'Lose Weight', value: 'lose_weight' },
+  { label: 'Maintain Fitness', value: 'maintain' },
+  { label: 'Increase Strength', value: 'increase_strength' },
+  { label: 'Improve Endurance', value: 'improve_endurance' },
+]
+
+const experienceOptions = [
+  { label: 'Beginner (0-1 years)', value: 'beginner' },
+  { label: 'Intermediate (1-3 years)', value: 'intermediate' },
+  { label: 'Advanced (3+ years)', value: 'advanced' },
+]
+
+const unitOptions = [
+  { label: 'Metric (kg, km)', value: 'metric' },
+  { label: 'Imperial (lb, mi)', value: 'imperial' },
+]
+
+async function saveProfile() {
+  saving.value = true
+  try {
+    await auth.updateProfile({
+      display_name: displayName.value || null,
+      bio: bio.value || null,
+      fitness_goal: fitnessGoal.value,
+      experience_level: experienceLevel.value,
+      unit_system: unitSystem.value,
+    })
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleSignOut() {
+  await auth.signOut()
+  await navigateTo('/login')
+}
+</script>
+
+<template>
+  <div class="max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <!-- Profile Header -->
+    <NCard>
+      <div class="flex flex-col sm:flex-row items-center gap-6">
+        <div class="relative">
+          <NAvatar
+            round
+            :size="100"
+            :src="auth.profile.value?.avatar_url || undefined"
+            class="text-3xl"
+          >
+            {{ auth.profile.value?.display_name?.[0] || auth.profile.value?.username?.[0] || 'U' }}
+          </NAvatar>
+          <button class="absolute bottom-0 right-0 p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+        <div class="text-center sm:text-left">
+          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+            {{ auth.profile.value?.display_name || auth.profile.value?.username || 'User' }}
+          </h1>
+          <p class="text-gray-500 dark:text-gray-400">
+            @{{ auth.profile.value?.username || 'username' }}
+          </p>
+          <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">
+            Member since {{ new Date(auth.profile.value?.created_at || Date.now()).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) }}
+          </p>
+        </div>
+      </div>
+    </NCard>
+
+    <!-- Tabs -->
+    <NTabs type="line" animated>
+      <!-- Profile Tab -->
+      <NTabPane name="profile" tab="Profile">
+        <NCard class="mt-4">
+          <form @submit.prevent="saveProfile">
+            <NForm>
+              <NFormItem label="Display Name">
+                <NInput v-model:value="displayName" placeholder="Your display name" />
+              </NFormItem>
+
+              <NFormItem label="Bio">
+                <NInput
+                  v-model:value="bio"
+                  type="textarea"
+                  placeholder="Tell us about yourself..."
+                  :rows="3"
+                />
+              </NFormItem>
+
+              <NFormItem label="Fitness Goal">
+                <NSelect
+                  v-model:value="fitnessGoal"
+                  :options="fitnessGoalOptions"
+                  placeholder="Select your goal"
+                />
+              </NFormItem>
+
+              <NFormItem label="Experience Level">
+                <NSelect
+                  v-model:value="experienceLevel"
+                  :options="experienceOptions"
+                  placeholder="Select your level"
+                />
+              </NFormItem>
+
+              <NButton
+                type="primary"
+                attr-type="submit"
+                :loading="saving"
+              >
+                Save Changes
+              </NButton>
+            </NForm>
+          </form>
+        </NCard>
+      </NTabPane>
+
+      <!-- Settings Tab -->
+      <NTabPane name="settings" tab="Settings">
+        <div class="space-y-4 mt-4">
+          <!-- Units -->
+          <NCard title="Units">
+            <NFormItem label="Measurement System">
+              <NSelect
+                v-model:value="unitSystem"
+                :options="unitOptions"
+              />
+            </NFormItem>
+          </NCard>
+
+          <!-- Appearance -->
+          <NCard title="Appearance">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-gray-900 dark:text-white">Theme</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  Current: {{ uiStore.theme === 'system' ? 'System' : uiStore.theme === 'dark' ? 'Dark' : 'Light' }}
+                </p>
+              </div>
+              <NButton @click="uiStore.toggleTheme">
+                Toggle Theme
+              </NButton>
+            </div>
+          </NCard>
+
+          <!-- Account -->
+          <NCard title="Account">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-white">Email</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ auth.user.value?.email }}
+                  </p>
+                </div>
+              </div>
+
+              <NDivider />
+
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-white">Sign Out</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Sign out of your account on this device
+                  </p>
+                </div>
+                <NButton type="error" @click="handleSignOut">
+                  Sign Out
+                </NButton>
+              </div>
+            </div>
+          </NCard>
+
+          <!-- Danger Zone -->
+          <NCard title="Danger Zone">
+            <div class="flex items-center justify-between p-4 border border-red-200 dark:border-red-900 rounded-lg bg-red-50 dark:bg-red-900/20">
+              <div>
+                <p class="font-medium text-red-700 dark:text-red-400">Delete Account</p>
+                <p class="text-sm text-red-600 dark:text-red-500">
+                  Permanently delete your account and all data
+                </p>
+              </div>
+              <NButton type="error" ghost>
+                Delete
+              </NButton>
+            </div>
+          </NCard>
+        </div>
+      </NTabPane>
+    </NTabs>
+  </div>
+</template>
