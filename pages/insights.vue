@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { NCard, NButton, NTag, NEmpty } from 'naive-ui'
+import { NCard, NButton, NTag, NEmpty, NSpin } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
 })
+
+const { workouts, loadWorkouts } = useWorkoutHistory()
 
 interface Insight {
   id: string
@@ -14,48 +16,72 @@ interface Insight {
   isRead: boolean
 }
 
-const insights = ref<Insight[]>([
-  {
-    id: '1',
-    type: 'celebration',
-    title: 'New PR on Bench Press!',
-    content: 'Congratulations! You just hit 100kg on bench press. That\'s a 5kg improvement from your previous best. Keep up the great work!',
-    createdAt: '2024-01-09T10:00:00Z',
-    isRead: false,
-  },
-  {
-    id: '2',
-    type: 'recommendation',
-    title: 'Consider a Deload Week',
-    content: 'You\'ve been training consistently for 6 weeks. Your volume has been high and progress is starting to plateau. A deload week could help you recover and come back stronger.',
-    createdAt: '2024-01-08T14:00:00Z',
-    isRead: false,
-  },
-  {
-    id: '3',
-    type: 'analysis',
-    title: 'Push/Pull Imbalance Detected',
-    content: 'Your pushing volume is 40% higher than your pulling volume this month. Consider adding more back exercises to maintain muscle balance and prevent shoulder issues.',
-    createdAt: '2024-01-07T09:00:00Z',
-    isRead: true,
-  },
-  {
-    id: '4',
-    type: 'warning',
-    title: 'Recovery Time Needed',
-    content: 'You trained legs yesterday and they\'re scheduled again today. Consider resting this muscle group for at least 48 hours between sessions for optimal recovery.',
-    createdAt: '2024-01-06T08:00:00Z',
-    isRead: true,
-  },
-  {
-    id: '5',
-    type: 'recommendation',
-    title: 'Try Progressive Overload',
-    content: 'You\'ve been using the same weight for Squats for 3 weeks. Try adding 2.5kg this week to continue making progress.',
-    createdAt: '2024-01-05T11:00:00Z',
-    isRead: true,
-  },
-])
+const insights = ref<Insight[]>([])
+const isLoading = ref(false)
+const error = ref<string | null>(null)
+const hasGenerated = ref(false)
+
+// Load workouts on mount
+onMounted(() => {
+  loadWorkouts()
+  // Load cached insights from localStorage
+  loadCachedInsights()
+})
+
+function loadCachedInsights() {
+  if (import.meta.client) {
+    const cached = localStorage.getItem('gym-app-insights')
+    if (cached) {
+      try {
+        const data = JSON.parse(cached)
+        // Check if insights are less than 24 hours old
+        if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+          insights.value = data.insights
+          hasGenerated.value = true
+        }
+      } catch (e) {
+        console.error('Failed to load cached insights:', e)
+      }
+    }
+  }
+}
+
+function saveCachedInsights() {
+  if (import.meta.client) {
+    localStorage.setItem('gym-app-insights', JSON.stringify({
+      insights: insights.value,
+      timestamp: Date.now(),
+    }))
+  }
+}
+
+async function generateInsights() {
+  if (workouts.value.length === 0) {
+    error.value = 'Complete some workouts first to get AI insights!'
+    return
+  }
+
+  isLoading.value = true
+  error.value = null
+
+  try {
+    const response = await $fetch('/api/ai/insights', {
+      method: 'POST',
+      body: {
+        workouts: workouts.value,
+      },
+    })
+
+    insights.value = response.insights
+    hasGenerated.value = true
+    saveCachedInsights()
+  } catch (e) {
+    console.error('Failed to generate insights:', e)
+    error.value = 'Failed to generate insights. Please check your API key configuration.'
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const unreadCount = computed(() => insights.value.filter(i => !i.isRead).length)
 
@@ -92,15 +118,20 @@ function formatDate(dateStr: string) {
 
 function markAsRead(id: string) {
   const insight = insights.value.find(i => i.id === id)
-  if (insight) insight.isRead = true
+  if (insight) {
+    insight.isRead = true
+    saveCachedInsights()
+  }
 }
 
 function markAllAsRead() {
   insights.value.forEach(i => i.isRead = true)
+  saveCachedInsights()
 }
 
 function dismissInsight(id: string) {
   insights.value = insights.value.filter(i => i.id !== id)
+  saveCachedInsights()
 }
 </script>
 
@@ -111,16 +142,58 @@ function dismissInsight(id: string) {
       <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">AI Insights</h1>
         <p class="text-gray-500 dark:text-gray-400 mt-1">
-          Personalized recommendations powered by AI
+          Personalized recommendations powered by Claude AI
         </p>
       </div>
-      <NButton v-if="unreadCount > 0" @click="markAllAsRead">
-        Mark all as read
-      </NButton>
+      <div class="flex gap-2">
+        <NButton
+          v-if="unreadCount > 0"
+          quaternary
+          @click="markAllAsRead"
+        >
+          Mark all as read
+        </NButton>
+        <NButton
+          type="primary"
+          :loading="isLoading"
+          @click="generateInsights"
+        >
+          <template #icon>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </template>
+          {{ hasGenerated ? 'Refresh Insights' : 'Generate Insights' }}
+        </NButton>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <NCard v-if="error" class="!bg-red-50 dark:!bg-red-900/20 border-red-200 dark:border-red-800">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+          <span class="text-xl">⚠️</span>
+        </div>
+        <div>
+          <p class="font-medium text-red-900 dark:text-red-100">
+            Unable to generate insights
+          </p>
+          <p class="text-sm text-red-700 dark:text-red-300">
+            {{ error }}
+          </p>
+        </div>
+      </div>
+    </NCard>
+
+    <!-- Loading State -->
+    <div v-if="isLoading" class="py-12 text-center">
+      <NSpin size="large" />
+      <p class="text-gray-500 dark:text-gray-400 mt-4">Analyzing your workout data...</p>
+      <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">This may take a few seconds</p>
     </div>
 
     <!-- Unread Badge -->
-    <NCard v-if="unreadCount > 0" class="!bg-indigo-50 dark:!bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
+    <NCard v-else-if="unreadCount > 0" class="!bg-indigo-50 dark:!bg-indigo-900/20 border-indigo-200 dark:border-indigo-800">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
           <span class="text-xl">✨</span>
@@ -130,14 +203,14 @@ function dismissInsight(id: string) {
             You have {{ unreadCount }} new insight{{ unreadCount > 1 ? 's' : '' }}
           </p>
           <p class="text-sm text-indigo-700 dark:text-indigo-300">
-            Check out what the AI has discovered about your training
+            Check out what Claude AI has discovered about your training
           </p>
         </div>
       </div>
     </NCard>
 
     <!-- Insights List -->
-    <div class="space-y-4">
+    <div v-if="!isLoading && insights.length > 0" class="space-y-4">
       <NCard
         v-for="insight in insights"
         :key="insight.id"
@@ -199,12 +272,53 @@ function dismissInsight(id: string) {
     </div>
 
     <!-- Empty State -->
-    <NEmpty v-if="insights.length === 0" description="No insights yet">
+    <NEmpty v-if="!isLoading && insights.length === 0 && !error" description="No insights yet">
       <template #extra>
-        <p class="text-gray-500 dark:text-gray-400 text-center max-w-md">
-          Complete more workouts and the AI will start providing personalized insights and recommendations.
-        </p>
+        <div class="text-center max-w-md">
+          <p class="text-gray-500 dark:text-gray-400 mb-4">
+            {{ workouts.length === 0
+              ? 'Complete some workouts first, then generate AI-powered insights and recommendations.'
+              : 'Click "Generate Insights" to get personalized recommendations based on your workout history.'
+            }}
+          </p>
+          <NButton
+            v-if="workouts.length > 0"
+            type="primary"
+            :loading="isLoading"
+            @click="generateInsights"
+          >
+            <template #icon>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </template>
+            Generate Insights
+          </NButton>
+          <NuxtLink
+            v-else
+            to="/workout/new"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-primary-900 dark:bg-white text-white dark:text-primary-900 rounded-xl font-medium hover:opacity-90 transition"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            Start a Workout
+          </NuxtLink>
+        </div>
       </template>
     </NEmpty>
+
+    <!-- Info Card -->
+    <NCard v-if="!isLoading && insights.length > 0" class="!bg-gray-50 dark:!bg-gray-800/50">
+      <div class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p>
+          Insights are generated by Claude AI based on your workout history.
+          Click "Refresh Insights" for updated recommendations based on your latest workouts.
+        </p>
+      </div>
+    </NCard>
   </div>
 </template>

@@ -9,9 +9,12 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
     "@pinia/nuxt": "^0.5.5",
     "@supabase/supabase-js": "^2.45.0",
     "@vee-validate/nuxt": "^4.14.0",
@@ -27,13 +30,16 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.32.0",
     "@nuxt/eslint": "^0.7.0",
     "@nuxtjs/tailwindcss": "^6.12.0",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/test-utils": "^2.4.6",
     "@vueuse/core": "^11.0.0",
     "@vueuse/nuxt": "^11.0.0",
     "eslint": "^9.15.0",
+    "happy-dom": "^20.1.0",
     "typescript": "^5.6.0",
+    "vitest": "^4.0.16",
     "vue-tsc": "^2.1.0"
   }
 }

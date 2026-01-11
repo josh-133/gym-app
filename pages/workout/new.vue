@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane } from 'naive-ui'
 import type { Exercise } from '~/types/database'
+import RestTimer from '~/components/workout/RestTimer.vue'
 
 definePageMeta({
   middleware: ['auth'],
@@ -460,6 +461,9 @@ onMounted(() => {
           description="Add your first exercise to get started"
         />
       </div>
+
+      <!-- Rest Timer -->
+      <RestTimer />
     </template>
 
     <!-- Exercise Picker Modal -->

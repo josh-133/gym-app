@@ -5,6 +5,13 @@ definePageMeta({
   middleware: ['auth'],
 })
 
+const { workouts, loadWorkouts } = useWorkoutHistory()
+
+// Ensure workouts are loaded
+onMounted(() => {
+  loadWorkouts()
+})
+
 const timeRange = ref('3months')
 const timeRangeOptions = [
   { label: 'Last 30 Days', value: '30days' },
@@ -14,115 +21,261 @@ const timeRangeOptions = [
   { label: 'All Time', value: 'all' },
 ]
 
-const selectedExercise = ref('bench-press')
-const exerciseOptions = [
-  { label: 'Bench Press', value: 'bench-press' },
-  { label: 'Squat', value: 'squat' },
-  { label: 'Deadlift', value: 'deadlift' },
-  { label: 'Overhead Press', value: 'ohp' },
-  { label: 'Barbell Row', value: 'row' },
-]
-
-const exerciseProgressData: Record<string, Array<{ date: string; weight: number; reps: number; estimated1RM: number }>> = {
-  'bench-press': [
-    { date: '2024-01-02', weight: 80, reps: 8, estimated1RM: 98 },
-    { date: '2024-01-05', weight: 82.5, reps: 7, estimated1RM: 99 },
-    { date: '2024-01-09', weight: 85, reps: 6, estimated1RM: 99 },
-    { date: '2024-01-12', weight: 85, reps: 7, estimated1RM: 102 },
-    { date: '2024-01-16', weight: 87.5, reps: 6, estimated1RM: 102 },
-    { date: '2024-01-19', weight: 90, reps: 5, estimated1RM: 101 },
-    { date: '2024-01-23', weight: 90, reps: 6, estimated1RM: 105 },
-    { date: '2024-01-26', weight: 92.5, reps: 5, estimated1RM: 104 },
-    { date: '2024-01-30', weight: 95, reps: 5, estimated1RM: 107 },
-    { date: '2024-02-02', weight: 97.5, reps: 5, estimated1RM: 110 },
-    { date: '2024-02-06', weight: 100, reps: 5, estimated1RM: 113 },
-  ],
-  'squat': [
-    { date: '2024-01-03', weight: 100, reps: 8, estimated1RM: 123 },
-    { date: '2024-01-07', weight: 105, reps: 7, estimated1RM: 126 },
-    { date: '2024-01-10', weight: 110, reps: 6, estimated1RM: 128 },
-    { date: '2024-01-14', weight: 112.5, reps: 6, estimated1RM: 131 },
-    { date: '2024-01-17', weight: 115, reps: 5, estimated1RM: 129 },
-    { date: '2024-01-21', weight: 120, reps: 5, estimated1RM: 135 },
-    { date: '2024-01-24', weight: 125, reps: 5, estimated1RM: 141 },
-    { date: '2024-01-28', weight: 130, reps: 4, estimated1RM: 142 },
-    { date: '2024-02-01', weight: 135, reps: 5, estimated1RM: 152 },
-    { date: '2024-02-04', weight: 140, reps: 5, estimated1RM: 158 },
-  ],
-  'deadlift': [
-    { date: '2024-01-04', weight: 140, reps: 5, estimated1RM: 158 },
-    { date: '2024-01-08', weight: 145, reps: 5, estimated1RM: 163 },
-    { date: '2024-01-11', weight: 150, reps: 4, estimated1RM: 164 },
-    { date: '2024-01-15', weight: 155, reps: 4, estimated1RM: 169 },
-    { date: '2024-01-18', weight: 160, reps: 3, estimated1RM: 170 },
-    { date: '2024-01-22', weight: 165, reps: 3, estimated1RM: 175 },
-    { date: '2024-01-25', weight: 170, reps: 3, estimated1RM: 180 },
-    { date: '2024-01-29', weight: 175, reps: 3, estimated1RM: 186 },
-    { date: '2024-02-01', weight: 180, reps: 3, estimated1RM: 191 },
-  ],
-  'ohp': [
-    { date: '2024-01-02', weight: 40, reps: 10, estimated1RM: 53 },
-    { date: '2024-01-06', weight: 42.5, reps: 8, estimated1RM: 52 },
-    { date: '2024-01-09', weight: 45, reps: 8, estimated1RM: 55 },
-    { date: '2024-01-13', weight: 47.5, reps: 7, estimated1RM: 57 },
-    { date: '2024-01-16', weight: 50, reps: 6, estimated1RM: 58 },
-    { date: '2024-01-20', weight: 52.5, reps: 6, estimated1RM: 61 },
-    { date: '2024-01-23', weight: 55, reps: 5, estimated1RM: 62 },
-    { date: '2024-01-27', weight: 57.5, reps: 6, estimated1RM: 67 },
-    { date: '2024-01-30', weight: 60, reps: 6, estimated1RM: 70 },
-  ],
-  'row': [
-    { date: '2024-01-03', weight: 60, reps: 10, estimated1RM: 80 },
-    { date: '2024-01-07', weight: 62.5, reps: 9, estimated1RM: 80 },
-    { date: '2024-01-10', weight: 65, reps: 8, estimated1RM: 80 },
-    { date: '2024-01-14', weight: 67.5, reps: 8, estimated1RM: 83 },
-    { date: '2024-01-17', weight: 70, reps: 8, estimated1RM: 86 },
-    { date: '2024-01-21', weight: 72.5, reps: 8, estimated1RM: 89 },
-    { date: '2024-01-25', weight: 75, reps: 8, estimated1RM: 92 },
-    { date: '2024-01-28', weight: 80, reps: 8, estimated1RM: 98 },
-    { date: '2024-02-01', weight: 85, reps: 8, estimated1RM: 104 },
-  ],
-}
-
-const exerciseProgress = computed(() => {
-  return exerciseProgressData[selectedExercise.value] || exerciseProgressData['bench-press']
+// Get all unique exercises from workout history
+const exerciseOptions = computed(() => {
+  const exercises = new Set<string>()
+  workouts.value.forEach(workout => {
+    workout.exercises.forEach(ex => {
+      exercises.add(ex.name)
+    })
+  })
+  return Array.from(exercises).map(name => ({
+    label: name,
+    value: name.toLowerCase().replace(/\s+/g, '-'),
+    originalName: name,
+  }))
 })
 
-const muscleVolumeData = ref([
-  { muscle: 'Chest', volume: 28500, sessions: 12 },
-  { muscle: 'Back', volume: 32200, sessions: 14 },
-  { muscle: 'Shoulders', volume: 18800, sessions: 10 },
-  { muscle: 'Legs', volume: 45600, sessions: 8 },
-  { muscle: 'Biceps', volume: 8200, sessions: 8 },
-  { muscle: 'Triceps', volume: 9100, sessions: 9 },
-])
+const selectedExercise = ref('')
 
-const prTimeline = ref([
-  { exercise: 'Bench Press', weight: 100, reps: 5, date: '2024-02-06', improvement: '+2.5kg' },
-  { exercise: 'Squat', weight: 140, reps: 5, date: '2024-02-04', improvement: '+5kg' },
-  { exercise: 'Deadlift', weight: 180, reps: 3, date: '2024-02-01', improvement: '+5kg' },
-  { exercise: 'Overhead Press', weight: 60, reps: 6, date: '2024-01-28', improvement: '+2.5kg' },
-  { exercise: 'Barbell Row', weight: 85, reps: 8, date: '2024-01-25', improvement: '+5kg' },
-])
+// Auto-select first exercise when available
+watch(exerciseOptions, (options) => {
+  if (options.length > 0 && !selectedExercise.value) {
+    selectedExercise.value = options[0].value
+  }
+}, { immediate: true })
 
-const weeklyVolumeTrend = ref([
-  { week: 'Week 1', push: 8500, pull: 9200, legs: 11500 },
-  { week: 'Week 2', push: 9100, pull: 8800, legs: 10200 },
-  { week: 'Week 3', push: 8800, pull: 9500, legs: 12100 },
-  { week: 'Week 4', push: 9600, pull: 10100, legs: 11800 },
-])
+// Filter workouts by time range
+const filteredWorkouts = computed(() => {
+  const now = new Date()
+  let cutoffDate: Date
 
-const maxWeight = computed(() => Math.max(...exerciseProgress.value.map(p => p.weight)))
-const minWeight = computed(() => Math.min(...exerciseProgress.value.map(p => p.weight)))
-const maxEstimated1RM = computed(() => Math.max(...exerciseProgress.value.map(p => p.estimated1RM)))
-const minEstimated1RM = computed(() => Math.min(...exerciseProgress.value.map(p => p.estimated1RM)))
+  switch (timeRange.value) {
+    case '30days':
+      cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      break
+    case '3months':
+      cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+      break
+    case '6months':
+      cutoffDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000)
+      break
+    case '1year':
+      cutoffDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+      break
+    default:
+      cutoffDate = new Date(0) // All time
+  }
+
+  return workouts.value.filter(w => new Date(w.date) >= cutoffDate)
+})
+
+// Calculate exercise progress from real data
+const exerciseProgress = computed(() => {
+  const selectedName = exerciseOptions.value.find(e => e.value === selectedExercise.value)?.originalName
+  if (!selectedName) return []
+
+  const progress: Array<{ date: string; weight: number; reps: number; estimated1RM: number }> = []
+
+  filteredWorkouts.value.forEach(workout => {
+    workout.exercises.forEach(ex => {
+      if (ex.name === selectedName) {
+        // Find the best set for this exercise in this workout
+        let bestWeight = 0
+        let bestReps = 0
+        ex.sets.forEach(set => {
+          if (set.completed && set.weight && set.reps) {
+            if (set.weight > bestWeight || (set.weight === bestWeight && set.reps > bestReps)) {
+              bestWeight = set.weight
+              bestReps = set.reps
+            }
+          }
+        })
+
+        if (bestWeight > 0 && bestReps > 0) {
+          // Calculate estimated 1RM using Epley formula
+          const estimated1RM = bestReps === 1 ? bestWeight : Math.round(bestWeight * (1 + bestReps / 30))
+          progress.push({
+            date: workout.date,
+            weight: bestWeight,
+            reps: bestReps,
+            estimated1RM,
+          })
+        }
+      }
+    })
+  })
+
+  // Sort by date ascending
+  progress.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  return progress
+})
+
+// Calculate muscle volume from real data
+const muscleVolumeData = computed(() => {
+  const muscleMap: Record<string, { volume: number; sessions: Set<string> }> = {}
+
+  // Define muscle groups for exercises
+  const exerciseMuscles: Record<string, string[]> = {
+    'Bench Press': ['Chest', 'Triceps', 'Shoulders'],
+    'Incline Dumbbell Press': ['Chest', 'Shoulders'],
+    'Cable Fly': ['Chest'],
+    'Overhead Press': ['Shoulders', 'Triceps'],
+    'Lateral Raise': ['Shoulders'],
+    'Tricep Pushdown': ['Triceps'],
+    'Squat': ['Legs'],
+    'Deadlift': ['Back', 'Legs'],
+    'Pull-up': ['Back', 'Biceps'],
+    'Barbell Row': ['Back', 'Biceps'],
+    'Lat Pulldown': ['Back', 'Biceps'],
+    'Barbell Curl': ['Biceps'],
+    'Romanian Deadlift': ['Legs'],
+    'Leg Press': ['Legs'],
+    'Leg Curl': ['Legs'],
+    'Leg Extension': ['Legs'],
+    'Calf Raise': ['Legs'],
+  }
+
+  filteredWorkouts.value.forEach(workout => {
+    workout.exercises.forEach(ex => {
+      const muscles = exerciseMuscles[ex.name] || ['Other']
+      const exerciseVolume = ex.sets.reduce((sum, set) => {
+        if (set.completed && set.weight && set.reps) {
+          return sum + (set.weight * set.reps)
+        }
+        return sum
+      }, 0)
+
+      // Distribute volume across muscle groups
+      muscles.forEach(muscle => {
+        if (!muscleMap[muscle]) {
+          muscleMap[muscle] = { volume: 0, sessions: new Set() }
+        }
+        muscleMap[muscle].volume += exerciseVolume / muscles.length
+        muscleMap[muscle].sessions.add(workout.id)
+      })
+    })
+  })
+
+  return Object.entries(muscleMap)
+    .map(([muscle, data]) => ({
+      muscle,
+      volume: Math.round(data.volume),
+      sessions: data.sessions.size,
+    }))
+    .sort((a, b) => b.volume - a.volume)
+})
+
+// Find PR timeline from real data
+const prTimeline = computed(() => {
+  const exerciseBests: Record<string, { weight: number; reps: number; date: string; estimated1RM: number }> = {}
+  const prs: Array<{ exercise: string; weight: number; reps: number; date: string; improvement: string }> = []
+
+  // Sort workouts by date ascending to find PRs in order
+  const sortedWorkouts = [...filteredWorkouts.value].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  )
+
+  sortedWorkouts.forEach(workout => {
+    workout.exercises.forEach(ex => {
+      ex.sets.forEach(set => {
+        if (set.completed && set.weight && set.reps) {
+          const estimated1RM = set.reps === 1 ? set.weight : Math.round(set.weight * (1 + set.reps / 30))
+          const current = exerciseBests[ex.name]
+
+          if (!current || estimated1RM > current.estimated1RM) {
+            const improvement = current ? estimated1RM - current.estimated1RM : 0
+            if (current) {
+              prs.push({
+                exercise: ex.name,
+                weight: set.weight,
+                reps: set.reps,
+                date: workout.date,
+                improvement: `+${improvement}kg (1RM)`,
+              })
+            }
+            exerciseBests[ex.name] = {
+              weight: set.weight,
+              reps: set.reps,
+              date: workout.date,
+              estimated1RM,
+            }
+          }
+        }
+      })
+    })
+  })
+
+  // Return most recent PRs first
+  return prs.reverse().slice(0, 5)
+})
+
+// Calculate weekly volume trend from real data
+const weeklyVolumeTrend = computed(() => {
+  const weeks: Record<string, { push: number; pull: number; legs: number }> = {}
+
+  // Categorize exercises
+  const pushExercises = ['Bench Press', 'Incline Dumbbell Press', 'Cable Fly', 'Overhead Press', 'Lateral Raise', 'Tricep Pushdown']
+  const pullExercises = ['Pull-up', 'Barbell Row', 'Lat Pulldown', 'Barbell Curl', 'Deadlift']
+  const legExercises = ['Squat', 'Romanian Deadlift', 'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raise']
+
+  filteredWorkouts.value.forEach(workout => {
+    const date = new Date(workout.date)
+    const weekStart = new Date(date)
+    weekStart.setDate(date.getDate() - date.getDay())
+    const weekKey = weekStart.toISOString().split('T')[0]
+
+    if (!weeks[weekKey]) {
+      weeks[weekKey] = { push: 0, pull: 0, legs: 0 }
+    }
+
+    workout.exercises.forEach(ex => {
+      const volume = ex.sets.reduce((sum, set) => {
+        if (set.completed && set.weight && set.reps) {
+          return sum + (set.weight * set.reps)
+        }
+        return sum
+      }, 0)
+
+      if (pushExercises.includes(ex.name)) {
+        weeks[weekKey].push += volume
+      } else if (pullExercises.includes(ex.name)) {
+        weeks[weekKey].pull += volume
+      } else if (legExercises.includes(ex.name)) {
+        weeks[weekKey].legs += volume
+      }
+    })
+  })
+
+  // Convert to array and sort by date, take last 4 weeks
+  return Object.entries(weeks)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-4)
+    .map(([weekKey], index) => ({
+      week: `Week ${index + 1}`,
+      ...weeks[weekKey],
+    }))
+})
+
+// Computed values for stats
+const maxWeight = computed(() => exerciseProgress.value.length ? Math.max(...exerciseProgress.value.map(p => p.weight)) : 0)
+const minWeight = computed(() => exerciseProgress.value.length ? Math.min(...exerciseProgress.value.map(p => p.weight)) : 0)
+const maxEstimated1RM = computed(() => exerciseProgress.value.length ? Math.max(...exerciseProgress.value.map(p => p.estimated1RM)) : 0)
+const minEstimated1RM = computed(() => exerciseProgress.value.length ? Math.min(...exerciseProgress.value.map(p => p.estimated1RM)) : 0)
 const weightIncrease = computed(() => maxWeight.value - minWeight.value)
-const estimatedGainPercent = computed(() => Math.round(((maxEstimated1RM.value - minEstimated1RM.value) / minEstimated1RM.value) * 100))
+const estimatedGainPercent = computed(() => minEstimated1RM.value > 0 ? Math.round(((maxEstimated1RM.value - minEstimated1RM.value) / minEstimated1RM.value) * 100) : 0)
 const sessionCount = computed(() => exerciseProgress.value.length)
-const selectedExerciseLabel = computed(() => exerciseOptions.find(e => e.value === selectedExercise.value)?.label || 'Exercise')
-const lastReps = computed(() => exerciseProgress.value[exerciseProgress.value.length - 1]?.reps || 0)
+const selectedExerciseLabel = computed(() => exerciseOptions.value.find(e => e.value === selectedExercise.value)?.label || 'Exercise')
+const lastReps = computed(() => exerciseProgress.value.length ? exerciseProgress.value[exerciseProgress.value.length - 1]?.reps : 0)
 const totalVolume = computed(() => muscleVolumeData.value.reduce((sum, m) => sum + m.volume, 0))
-const maxMuscleVolume = computed(() => Math.max(...muscleVolumeData.value.map(m => m.volume)))
+const maxMuscleVolume = computed(() => muscleVolumeData.value.length ? Math.max(...muscleVolumeData.value.map(m => m.volume)) : 1)
+const maxWeeklyVolume = computed(() => {
+  let max = 1
+  weeklyVolumeTrend.value.forEach(w => {
+    max = Math.max(max, w.push, w.pull, w.legs)
+  })
+  return max * 1.2 // Add 20% padding
+})
 
 function formatVolume(kg: number) {
   if (kg >= 1000) {
@@ -136,6 +289,7 @@ function formatDate(dateStr: string) {
 }
 
 function getProgressPercentage(value: number, max: number) {
+  if (max === 0) return 0
   return (value / max) * 100
 }
 </script>
@@ -162,215 +316,256 @@ function getProgressPercentage(value: number, max: number) {
       />
     </div>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="stat-card">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Volume</p>
-        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ formatVolume(totalVolume) }}kg</p>
-        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this period</p>
+    <!-- No Data State -->
+    <div v-if="workouts.length === 0" class="card p-12 text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <svg class="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
       </div>
-      <div class="stat-card">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">New PRs</p>
-        <p class="text-3xl font-bold text-accent-500">{{ prTimeline.length }}</p>
-        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">personal records</p>
-      </div>
-      <div class="stat-card">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Best {{ selectedExerciseLabel }}</p>
-        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxWeight }}kg</p>
-        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">x {{ lastReps }} reps</p>
-      </div>
-      <div class="stat-card">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Est. 1RM</p>
-        <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxEstimated1RM }}kg</p>
-        <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">{{ selectedExerciseLabel.toLowerCase() }}</p>
-      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Workout Data Yet</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">Complete some workouts to see your strength progress!</p>
+      <NuxtLink to="/workout/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-900 dark:bg-white text-white dark:text-primary-900 rounded-xl font-medium hover:opacity-90 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Start a Workout
+      </NuxtLink>
     </div>
 
-    <!-- Exercise Progress Chart -->
-    <div class="card p-6">
-      <div class="flex items-center justify-between mb-6">
-        <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Exercise Progress</h3>
-        <NSelect
-          v-model:value="selectedExercise"
-          :options="exerciseOptions"
-          style="width: 160px"
-          size="small"
-        />
+    <template v-else>
+      <!-- Summary Cards -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="stat-card">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Volume</p>
+          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ formatVolume(totalVolume) }}kg</p>
+          <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this period</p>
+        </div>
+        <div class="stat-card">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">New PRs</p>
+          <p class="text-3xl font-bold text-accent-500">{{ prTimeline.length }}</p>
+          <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">personal records</p>
+        </div>
+        <div class="stat-card">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Best {{ selectedExerciseLabel }}</p>
+          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxWeight || '—' }}{{ maxWeight ? 'kg' : '' }}</p>
+          <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">{{ lastReps ? `x ${lastReps} reps` : 'no data' }}</p>
+        </div>
+        <div class="stat-card">
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Est. 1RM</p>
+          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxEstimated1RM || '—' }}{{ maxEstimated1RM ? 'kg' : '' }}</p>
+          <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">{{ selectedExerciseLabel.toLowerCase() }}</p>
+        </div>
       </div>
 
-      <!-- Chart Area -->
-      <div class="relative">
-        <!-- Y-axis labels -->
-        <div class="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-400 dark:text-gray-500">
-          <span>{{ maxWeight + 10 }}kg</span>
-          <span>{{ Math.round((maxWeight + 10) * 0.75) }}kg</span>
-          <span>{{ Math.round((maxWeight + 10) * 0.5) }}kg</span>
-          <span>{{ Math.round((maxWeight + 10) * 0.25) }}kg</span>
-          <span>0kg</span>
+      <!-- Exercise Progress Chart -->
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Exercise Progress</h3>
+          <NSelect
+            v-model:value="selectedExercise"
+            :options="exerciseOptions"
+            style="width: 180px"
+            size="small"
+            :disabled="exerciseOptions.length === 0"
+          />
         </div>
 
-        <!-- Chart -->
-        <div class="ml-14 h-64 relative">
-          <!-- Grid lines -->
-          <div class="absolute inset-0 flex flex-col justify-between">
-            <div class="border-b border-gray-100 dark:border-gray-800"></div>
-            <div class="border-b border-gray-100 dark:border-gray-800"></div>
-            <div class="border-b border-gray-100 dark:border-gray-800"></div>
-            <div class="border-b border-gray-100 dark:border-gray-800"></div>
-            <div class="border-b border-gray-200 dark:border-gray-700"></div>
+        <!-- No exercise data state -->
+        <div v-if="exerciseProgress.length === 0" class="py-12 text-center text-gray-500 dark:text-gray-400">
+          <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <p>No data for this exercise yet</p>
+          <p class="text-sm mt-1">Log some workouts with this exercise to see progress</p>
+        </div>
+
+        <!-- Chart Area -->
+        <div v-else class="relative">
+          <!-- Y-axis labels -->
+          <div class="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-400 dark:text-gray-500">
+            <span>{{ maxWeight + 10 }}kg</span>
+            <span>{{ Math.round((maxWeight + 10) * 0.75) }}kg</span>
+            <span>{{ Math.round((maxWeight + 10) * 0.5) }}kg</span>
+            <span>{{ Math.round((maxWeight + 10) * 0.25) }}kg</span>
+            <span>0kg</span>
           </div>
 
-          <!-- Data points and line -->
-          <svg class="absolute inset-0 w-full h-full overflow-visible">
-            <defs>
-              <linearGradient id="progressFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" style="stop-color: rgb(239, 68, 68); stop-opacity: 0.15" />
-                <stop offset="100%" style="stop-color: rgb(239, 68, 68); stop-opacity: 0" />
-              </linearGradient>
-            </defs>
+          <!-- Chart -->
+          <div class="ml-14 h-64 relative">
+            <!-- Grid lines -->
+            <div class="absolute inset-0 flex flex-col justify-between">
+              <div class="border-b border-gray-100 dark:border-gray-800"></div>
+              <div class="border-b border-gray-100 dark:border-gray-800"></div>
+              <div class="border-b border-gray-100 dark:border-gray-800"></div>
+              <div class="border-b border-gray-100 dark:border-gray-800"></div>
+              <div class="border-b border-gray-200 dark:border-gray-700"></div>
+            </div>
 
-            <!-- Area fill -->
-            <path
-              :d="`M ${exerciseProgress.map((p, i) => `${(i / (exerciseProgress.length - 1)) * 100}%,${100 - getProgressPercentage(p.weight, maxWeight + 10)}%`).join(' L ')} L 100%,100% L 0%,100% Z`"
-              fill="url(#progressFill)"
-            />
+            <!-- Data points and line -->
+            <svg class="absolute inset-0 w-full h-full overflow-visible">
+              <defs>
+                <linearGradient id="progressFill" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" style="stop-color: rgb(239, 68, 68); stop-opacity: 0.15" />
+                  <stop offset="100%" style="stop-color: rgb(239, 68, 68); stop-opacity: 0" />
+                </linearGradient>
+              </defs>
 
-            <!-- Line -->
-            <polyline
-              :points="exerciseProgress.map((p, i) => `${(i / (exerciseProgress.length - 1)) * 100}%,${100 - getProgressPercentage(p.weight, maxWeight + 10)}%`).join(' ')"
-              fill="none"
-              stroke="#ef4444"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
+              <!-- Area fill -->
+              <path
+                :d="`M ${exerciseProgress.map((p, i) => `${(i / Math.max(exerciseProgress.length - 1, 1)) * 100}%,${100 - getProgressPercentage(p.weight, maxWeight + 10)}%`).join(' L ')} L 100%,100% L 0%,100% Z`"
+                fill="url(#progressFill)"
+              />
 
-            <!-- Data points -->
-            <g v-for="(point, i) in exerciseProgress" :key="i">
-              <circle
-                :cx="`${(i / (exerciseProgress.length - 1)) * 100}%`"
-                :cy="`${100 - getProgressPercentage(point.weight, maxWeight + 10)}%`"
-                r="4"
-                fill="white"
+              <!-- Line -->
+              <polyline
+                :points="exerciseProgress.map((p, i) => `${(i / Math.max(exerciseProgress.length - 1, 1)) * 100}%,${100 - getProgressPercentage(p.weight, maxWeight + 10)}%`).join(' ')"
+                fill="none"
                 stroke="#ef4444"
                 stroke-width="2"
-                class="hover:r-6 cursor-pointer"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               />
-            </g>
-          </svg>
+
+              <!-- Data points -->
+              <g v-for="(point, i) in exerciseProgress" :key="i">
+                <circle
+                  :cx="`${(i / Math.max(exerciseProgress.length - 1, 1)) * 100}%`"
+                  :cy="`${100 - getProgressPercentage(point.weight, maxWeight + 10)}%`"
+                  r="4"
+                  fill="white"
+                  stroke="#ef4444"
+                  stroke-width="2"
+                  class="hover:r-6 cursor-pointer"
+                />
+              </g>
+            </svg>
+          </div>
+
+          <!-- X-axis labels -->
+          <div class="ml-14 flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-2">
+            <span v-for="(point, i) in exerciseProgress.filter((_, idx) => idx % Math.max(1, Math.floor(exerciseProgress.length / 5)) === 0)" :key="i">
+              {{ formatDate(point.date) }}
+            </span>
+          </div>
         </div>
 
-        <!-- X-axis labels -->
-        <div class="ml-14 flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-2">
-          <span v-for="(point, i) in exerciseProgress.filter((_, idx) => idx % 2 === 0)" :key="i">
-            {{ formatDate(point.date) }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Stats row -->
-      <div class="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
-        <div class="text-center">
-          <p class="text-2xl font-bold text-primary-900 dark:text-white">+{{ weightIncrease }}kg</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">Weight Increase</p>
-        </div>
-        <div class="text-center">
-          <p class="text-2xl font-bold text-success-500">+{{ estimatedGainPercent }}%</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">Est. 1RM Gain</p>
-        </div>
-        <div class="text-center">
-          <p class="text-2xl font-bold text-primary-900 dark:text-white">{{ sessionCount }}</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">Sessions</p>
-        </div>
-      </div>
-    </div>
-
-    <div class="grid lg:grid-cols-2 gap-6">
-      <!-- Volume by Muscle Group -->
-      <div class="card p-6">
-        <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">Volume by Muscle Group</h3>
-        <div class="space-y-5">
-          <div v-for="muscle in muscleVolumeData" :key="muscle.muscle">
-            <div class="flex items-center justify-between mb-2">
-              <span class="font-medium text-primary-900 dark:text-white">{{ muscle.muscle }}</span>
-              <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatVolume(muscle.volume) }}kg</span>
-            </div>
-            <div class="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-              <div
-                class="h-full rounded-full bg-primary-900 dark:bg-white transition-all duration-500"
-                :style="{ width: `${(muscle.volume / maxMuscleVolume) * 100}%` }"
-              ></div>
-            </div>
+        <!-- Stats row -->
+        <div v-if="exerciseProgress.length > 0" class="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
+          <div class="text-center">
+            <p class="text-2xl font-bold text-primary-900 dark:text-white">+{{ weightIncrease }}kg</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Weight Increase</p>
+          </div>
+          <div class="text-center">
+            <p class="text-2xl font-bold text-success-500">+{{ estimatedGainPercent }}%</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Est. 1RM Gain</p>
+          </div>
+          <div class="text-center">
+            <p class="text-2xl font-bold text-primary-900 dark:text-white">{{ sessionCount }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Sessions</p>
           </div>
         </div>
       </div>
 
-      <!-- PR Timeline -->
-      <div class="card p-6">
-        <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">PR Timeline</h3>
-        <div class="space-y-3">
-          <div
-            v-for="(pr, index) in prTimeline"
-            :key="index"
-            class="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-[#222222] border border-gray-100 dark:border-gray-700"
-          >
-            <div class="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center flex-shrink-0">
-              <svg class="w-5 h-5 text-accent-500" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-              </svg>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <h4 class="font-semibold text-primary-900 dark:text-white">{{ pr.exercise }}</h4>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400 font-medium">{{ pr.improvement }}</span>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <!-- Volume by Muscle Group -->
+        <div class="card p-6">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">Volume by Muscle Group</h3>
+          <div v-if="muscleVolumeData.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+            No volume data yet
+          </div>
+          <div v-else class="space-y-5">
+            <div v-for="muscle in muscleVolumeData" :key="muscle.muscle">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-medium text-primary-900 dark:text-white">{{ muscle.muscle }}</span>
+                <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatVolume(muscle.volume) }}kg</span>
               </div>
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ pr.weight }}kg x {{ pr.reps }} reps · {{ formatDate(pr.date) }}
-              </p>
+              <div class="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-primary-900 dark:bg-white transition-all duration-500"
+                  :style="{ width: `${(muscle.volume / maxMuscleVolume) * 100}%` }"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PR Timeline -->
+        <div class="card p-6">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">PR Timeline</h3>
+          <div v-if="prTimeline.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+            No PRs recorded yet
+          </div>
+          <div v-else class="space-y-3">
+            <div
+              v-for="(pr, index) in prTimeline"
+              :key="index"
+              class="flex items-center gap-4 p-4 rounded-xl bg-gray-50 dark:bg-[#222222] border border-gray-100 dark:border-gray-700"
+            >
+              <div class="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-accent-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <h4 class="font-semibold text-primary-900 dark:text-white">{{ pr.exercise }}</h4>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400 font-medium">{{ pr.improvement }}</span>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ pr.weight }}kg x {{ pr.reps }} reps · {{ formatDate(pr.date) }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Weekly Volume Trend -->
-    <div class="card p-6">
-      <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">Weekly Volume Trend</h3>
+      <!-- Weekly Volume Trend -->
+      <div class="card p-6">
+        <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-6">Weekly Volume Trend</h3>
 
-      <div class="flex gap-6 mb-6">
-        <div class="flex items-center gap-2">
-          <div class="w-3 h-3 rounded-full bg-accent-500"></div>
-          <span class="text-sm text-gray-600 dark:text-gray-400">Push</span>
+        <div v-if="weeklyVolumeTrend.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+          Not enough data for weekly trends yet
         </div>
-        <div class="flex items-center gap-2">
-          <div class="w-3 h-3 rounded-full bg-primary-400"></div>
-          <span class="text-sm text-gray-600 dark:text-gray-400">Pull</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <div class="w-3 h-3 rounded-full bg-success-500"></div>
-          <span class="text-sm text-gray-600 dark:text-gray-400">Legs</span>
-        </div>
-      </div>
 
-      <div class="grid grid-cols-4 gap-6">
-        <div v-for="week in weeklyVolumeTrend" :key="week.week" class="text-center">
-          <div class="h-40 flex items-end justify-center gap-2">
-            <div
-              class="w-5 bg-accent-500 rounded-t transition-all"
-              :style="{ height: `${(week.push / 15000) * 100}%` }"
-            ></div>
-            <div
-              class="w-5 bg-primary-400 rounded-t transition-all"
-              :style="{ height: `${(week.pull / 15000) * 100}%` }"
-            ></div>
-            <div
-              class="w-5 bg-success-500 rounded-t transition-all"
-              :style="{ height: `${(week.legs / 15000) * 100}%` }"
-            ></div>
+        <template v-else>
+          <div class="flex gap-6 mb-6">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-accent-500"></div>
+              <span class="text-sm text-gray-600 dark:text-gray-400">Push</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-primary-400"></div>
+              <span class="text-sm text-gray-600 dark:text-gray-400">Pull</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-success-500"></div>
+              <span class="text-sm text-gray-600 dark:text-gray-400">Legs</span>
+            </div>
           </div>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mt-3">{{ week.week }}</p>
-        </div>
+
+          <div class="grid gap-6" :class="weeklyVolumeTrend.length === 4 ? 'grid-cols-4' : `grid-cols-${weeklyVolumeTrend.length}`">
+            <div v-for="week in weeklyVolumeTrend" :key="week.week" class="text-center">
+              <div class="h-40 flex items-end justify-center gap-2">
+                <div
+                  class="w-5 bg-accent-500 rounded-t transition-all"
+                  :style="{ height: `${(week.push / maxWeeklyVolume) * 100}%` }"
+                ></div>
+                <div
+                  class="w-5 bg-primary-400 rounded-t transition-all"
+                  :style="{ height: `${(week.pull / maxWeeklyVolume) * 100}%` }"
+                ></div>
+                <div
+                  class="w-5 bg-success-500 rounded-t transition-all"
+                  :style="{ height: `${(week.legs / maxWeeklyVolume) * 100}%` }"
+                ></div>
+              </div>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-3">{{ week.week }}</p>
+            </div>
+          </div>
+        </template>
       </div>
-    </div>
+    </template>
   </div>
 </template>
