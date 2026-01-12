@@ -10,6 +10,7 @@ export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say'
 export type RecordType = 'max_weight' | 'max_reps' | 'max_volume' | 'max_duration' | 'max_distance' | 'fastest_pace'
 export type InsightType = 'recommendation' | 'analysis' | 'warning' | 'celebration'
 export type AchievementCategory = 'consistency' | 'strength' | 'endurance' | 'milestone' | 'social'
+export type SubscriptionStatus = 'free' | 'premium' | 'cancelled' | 'past_due'
 
 export type MuscleGroup =
   | 'chest'
@@ -63,8 +64,25 @@ export interface Profile {
   unit_system: UnitSystem
   fitness_goal: FitnessGoal | null
   experience_level: ExperienceLevel | null
+  // Subscription fields
+  subscription_status: SubscriptionStatus
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  subscription_started_at: string | null
+  subscription_ends_at: string | null
   created_at: string
   updated_at: string
+}
+
+// Subscription event for audit logging
+export interface SubscriptionEvent {
+  id: string
+  user_id: string
+  event_type: string
+  stripe_event_id: string | null
+  stripe_subscription_id: string | null
+  metadata: Record<string, unknown>
+  created_at: string
 }
 
 // Exercise library

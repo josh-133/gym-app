@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { NCard, NButton, NTag, NEmpty, NSpin } from 'naive-ui'
+import UpgradeModal from '~/components/subscription/UpgradeModal.vue'
 
 definePageMeta({
   middleware: ['auth'],
 })
 
+const { session } = useAuth()
+const { isPremium } = useSubscription()
 const { workouts, loadWorkouts } = useWorkoutHistory()
+
+const showUpgradeModal = ref(false)
 
 interface Insight {
   id: string
@@ -56,6 +61,11 @@ function saveCachedInsights() {
 }
 
 async function generateInsights() {
+  if (!isPremium.value) {
+    showUpgradeModal.value = true
+    return
+  }
+
   if (workouts.value.length === 0) {
     error.value = 'Complete some workouts first to get AI insights!'
     return
@@ -67,6 +77,9 @@ async function generateInsights() {
   try {
     const response = await $fetch('/api/ai/insights', {
       method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.value?.access_token}`,
+      },
       body: {
         workouts: workouts.value,
       },
@@ -320,5 +333,8 @@ function dismissInsight(id: string) {
         </p>
       </div>
     </NCard>
+
+    <!-- Upgrade Modal -->
+    <UpgradeModal v-model:show="showUpgradeModal" />
   </div>
 </template>

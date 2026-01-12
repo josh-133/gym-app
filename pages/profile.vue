@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { NCard, NButton, NForm, NFormItem, NInput, NSelect, NAvatar, NTabs, NTabPane, NDivider, NSwitch } from 'naive-ui'
+import { NCard, NButton, NForm, NFormItem, NInput, NSelect, NAvatar, NTabs, NTabPane, NDivider, NSwitch, NTag } from 'naive-ui'
+import PremiumBadge from '~/components/subscription/PremiumBadge.vue'
 
 definePageMeta({
   middleware: ['auth'],
@@ -7,6 +8,20 @@ definePageMeta({
 
 const auth = useAuth()
 const uiStore = useUIStore()
+const { isPremium, status, openCustomerPortal } = useSubscription()
+
+const isManagingSubscription = ref(false)
+
+async function handleManageSubscription() {
+  isManagingSubscription.value = true
+  try {
+    await openCustomerPortal()
+  } catch (error) {
+    console.error('Failed to open portal:', error)
+  } finally {
+    isManagingSubscription.value = false
+  }
+}
 
 // Profile form
 const displayName = ref(auth.profile.value?.display_name || '')
@@ -79,9 +94,12 @@ async function handleSignOut() {
           </button>
         </div>
         <div class="text-center sm:text-left">
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-            {{ auth.profile.value?.display_name || auth.profile.value?.username || 'User' }}
-          </h1>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+              {{ auth.profile.value?.display_name || auth.profile.value?.username || 'User' }}
+            </h1>
+            <PremiumBadge v-if="isPremium" />
+          </div>
           <p class="text-gray-500 dark:text-gray-400">
             @{{ auth.profile.value?.username || 'username' }}
           </p>
@@ -143,6 +161,36 @@ async function handleSignOut() {
       <!-- Settings Tab -->
       <NTabPane name="settings" tab="Settings">
         <div class="space-y-4 mt-4">
+          <!-- Subscription -->
+          <NCard title="Subscription">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="flex items-center gap-2">
+                  <p class="font-medium text-gray-900 dark:text-white">Plan</p>
+                  <NTag v-if="isPremium" type="success" size="small">Premium</NTag>
+                  <NTag v-else type="default" size="small">Free</NTag>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  {{ isPremium ? 'You have access to all AI features' : 'Upgrade to unlock AI workout generator and insights' }}
+                </p>
+              </div>
+              <NButton
+                v-if="isPremium"
+                :loading="isManagingSubscription"
+                @click="handleManageSubscription"
+              >
+                Manage
+              </NButton>
+              <NButton
+                v-else
+                type="primary"
+                @click="navigateTo('/upgrade')"
+              >
+                Upgrade
+              </NButton>
+            </div>
+          </NCard>
+
           <!-- Units -->
           <NCard title="Units">
             <NFormItem label="Measurement System">

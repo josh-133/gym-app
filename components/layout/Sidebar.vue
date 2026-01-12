@@ -1,27 +1,32 @@
 <script setup lang="ts">
+import PremiumBadge from '~/components/subscription/PremiumBadge.vue'
+
 defineProps<{
   collapsed?: boolean
 }>()
 
 const route = useRoute()
+const { isPremium } = useSubscription()
 
 interface NavItem {
   label: string
   icon: string
   to: string
   badge?: number
+  premium?: boolean
 }
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: 'home', to: '/dashboard' },
   { label: 'Workout', icon: 'dumbbell', to: '/workout' },
+  { label: 'Generate', icon: 'bolt', to: '/generate', premium: true },
   { label: 'Calendar', icon: 'calendar', to: '/calendar' },
   { label: 'Exercises', icon: 'list', to: '/exercises' },
   { label: 'Progress', icon: 'chart', to: '/progress' },
   { label: 'Records', icon: 'trophy', to: '/records' },
   { label: 'Achievements', icon: 'medal', to: '/achievements' },
   { label: 'Tools', icon: 'tools', to: '/tools' },
-  { label: 'Insights', icon: 'sparkles', to: '/insights' },
+  { label: 'Insights', icon: 'sparkles', to: '/insights', premium: true },
 ]
 
 const bottomNavItems: NavItem[] = [
@@ -73,6 +78,11 @@ function isActive(path: string) {
             >
               {{ item.badge }}
             </span>
+            <PremiumBadge
+              v-if="!collapsed && item.premium && !isPremium"
+              size="small"
+              class="ml-auto"
+            />
           </NuxtLink>
         </li>
       </ul>
@@ -107,6 +117,9 @@ const icons: Record<string, any> = {
   },
   dumbbell: {
     template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h2m12 0h2M6 7v10M18 7v10M8 7h8M8 17h8M4 17h2m12 0h2"/></svg>`,
+  },
+  bolt: {
+    template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`,
   },
   calendar: {
     template: `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`,

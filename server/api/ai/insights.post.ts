@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { getAuthenticatedUser } from '~/server/utils/auth'
+import { getSubscriptionStatus, requirePremium } from '~/server/utils/subscription'
 
 interface WorkoutData {
   id: string
@@ -27,6 +29,11 @@ interface Insight {
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig()
+
+  // Authenticate and check premium subscription
+  const user = await getAuthenticatedUser(event)
+  const subscription = await getSubscriptionStatus(event, user.id)
+  requirePremium(subscription)
 
   if (!config.anthropicApiKey) {
     throw createError({
