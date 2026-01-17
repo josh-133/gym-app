@@ -5,6 +5,7 @@ definePageMeta({
 
 const { $supabase } = useNuxtApp()
 const auth = useAuth()
+const route = useRoute()
 
 onMounted(async () => {
   if (!$supabase) {
@@ -13,7 +14,37 @@ onMounted(async () => {
   }
 
   try {
-    // Handle the OAuth callback - Supabase will exchange the code for a session
+    // Check for error in URL (from OAuth provider)
+    const errorParam = route.query.error as string
+    const errorDescription = route.query.error_description as string
+
+    if (errorParam) {
+      console.error('OAuth error:', errorParam, errorDescription)
+      await navigateTo(`/login?error=${encodeURIComponent(errorDescription || errorParam)}`)
+      return
+    }
+
+    // Check for authorization code in URL (PKCE flow)
+    const code = route.query.code as string
+
+    if (code) {
+      // Exchange the code for a session
+      const { data, error } = await $supabase.auth.exchangeCodeForSession(code)
+
+      if (error) {
+        console.error('Code exchange error:', error)
+        await navigateTo('/login?error=auth_failed')
+        return
+      }
+
+      if (data.session) {
+        await auth.initialize()
+        await navigateTo('/dashboard')
+        return
+      }
+    }
+
+    // Fallback: check if session already exists (hash fragment flow)
     const { data, error } = await $supabase.auth.getSession()
 
     if (error) {
