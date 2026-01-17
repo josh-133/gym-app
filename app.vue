@@ -1,5 +1,10 @@
 <script setup lang="ts">
-// Global app wrapper
+// Initialize auth on app start
+const auth = useAuth()
+
+onMounted(async () => {
+  await auth.initialize()
+})
 </script>
 
 <template>

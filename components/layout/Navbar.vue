@@ -36,7 +36,11 @@ async function handleUserMenuSelect(key: string) {
       await navigateTo('/profile?tab=settings')
       break
     case 'signout':
-      await auth.signOut()
+      try {
+        await auth.signOut()
+      } catch (error) {
+        console.error('Sign out error:', error)
+      }
       await navigateTo('/login')
       break
   }

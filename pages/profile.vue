@@ -24,13 +24,28 @@ async function handleManageSubscription() {
 }
 
 // Profile form
-const displayName = ref(auth.profile.value?.display_name || '')
-const bio = ref(auth.profile.value?.bio || '')
-const fitnessGoal = ref(auth.profile.value?.fitness_goal || null)
-const experienceLevel = ref(auth.profile.value?.experience_level || null)
-const unitSystem = ref(auth.profile.value?.unit_system || 'metric')
+const displayName = ref('')
+const bio = ref('')
+const fitnessGoal = ref<string | null>(null)
+const experienceLevel = ref<string | null>(null)
+const unitSystem = ref('metric')
 
 const saving = ref(false)
+
+// Watch for profile data to load and update form
+watch(
+  () => auth.profile.value,
+  (newProfile) => {
+    if (newProfile) {
+      displayName.value = newProfile.display_name || ''
+      bio.value = newProfile.bio || ''
+      fitnessGoal.value = newProfile.fitness_goal || null
+      experienceLevel.value = newProfile.experience_level || null
+      unitSystem.value = newProfile.unit_system || 'metric'
+    }
+  },
+  { immediate: true }
+)
 
 const fitnessGoalOptions = [
   { label: 'Build Muscle', value: 'build_muscle' },
@@ -67,7 +82,12 @@ async function saveProfile() {
 }
 
 async function handleSignOut() {
-  await auth.signOut()
+  try {
+    await auth.signOut()
+  } catch (error) {
+    console.error('Sign out error:', error)
+  }
+  // Always navigate to login, even if signOut fails
   await navigateTo('/login')
 }
 </script>
