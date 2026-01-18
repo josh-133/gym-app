@@ -5,34 +5,23 @@ definePageMeta({
   middleware: ['auth'],
 })
 
-// Mock stats data
+// Stats (start at 0, no mock data)
 const stats = ref({
-  totalWorkouts: 127,
-  totalVolume: 245800,
-  totalDuration: 6840, // minutes
-  currentStreak: 12,
-  longestStreak: 21,
-  averageWorkoutDuration: 54,
-  workoutsThisWeek: 4,
-  workoutsThisMonth: 16,
-  prsThisMonth: 8,
+  totalWorkouts: 0,
+  totalVolume: 0,
+  totalDuration: 0,
+  currentStreak: 0,
+  longestStreak: 0,
+  averageWorkoutDuration: 0,
+  workoutsThisWeek: 0,
+  workoutsThisMonth: 0,
+  prsThisMonth: 0,
 })
 
-// Mock weekly data for charts
-const weeklyVolume = ref([
-  { week: 'Week 1', volume: 12500 },
-  { week: 'Week 2', volume: 14200 },
-  { week: 'Week 3', volume: 11800 },
-  { week: 'Week 4', volume: 15600 },
-])
+// Empty arrays for charts (will be populated from real data)
+const weeklyVolume = ref<{ week: string; volume: number }[]>([])
 
-const muscleDistribution = ref([
-  { muscle: 'Chest', percentage: 22 },
-  { muscle: 'Back', percentage: 25 },
-  { muscle: 'Shoulders', percentage: 15 },
-  { muscle: 'Legs', percentage: 28 },
-  { muscle: 'Arms', percentage: 10 },
-])
+const muscleDistribution = ref<{ muscle: string; percentage: number }[]>([])
 
 // Analytics navigation cards
 const analyticsCards = [
@@ -42,10 +31,6 @@ const analyticsCards = [
     icon: 'strength',
     to: '/progress/strength',
     gradient: 'from-primary-500 via-accent-500 to-secondary-500',
-    stats: [
-      { label: 'PRs This Month', value: '8' },
-      { label: 'Top Exercise', value: 'Bench Press' },
-    ],
   },
   {
     title: 'Cardio Analytics',
@@ -53,10 +38,6 @@ const analyticsCards = [
     icon: 'cardio',
     to: '/progress/cardio',
     gradient: 'from-energy-500 via-warning-500 to-accent-500',
-    stats: [
-      { label: 'Total Distance', value: '42.5 km' },
-      { label: 'Avg Heart Rate', value: '145 bpm' },
-    ],
   },
   {
     title: 'Body Stats',
@@ -64,10 +45,6 @@ const analyticsCards = [
     icon: 'body',
     to: '/progress/body',
     gradient: 'from-success-500 via-secondary-500 to-primary-500',
-    stats: [
-      { label: 'Current Weight', value: '75 kg' },
-      { label: 'Body Fat', value: '15%' },
-    ],
   },
 ]
 
@@ -175,13 +152,6 @@ function formatDuration(minutes: number) {
               {{ card.description }}
             </p>
 
-            <!-- Mini Stats -->
-            <div class="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-              <div v-for="stat in card.stats" :key="stat.label">
-                <p class="text-xs text-gray-400 dark:text-gray-500">{{ stat.label }}</p>
-                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ stat.value }}</p>
-              </div>
-            </div>
           </div>
 
           <!-- Arrow -->
@@ -232,7 +202,14 @@ function formatDuration(minutes: number) {
 
       <!-- Volume Chart -->
       <NCard title="Weekly Volume">
-        <div class="space-y-4">
+        <div v-if="weeklyVolume.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+          <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <p>No volume data yet</p>
+          <p class="text-sm mt-1">Complete workouts to see your weekly volume</p>
+        </div>
+        <div v-else class="space-y-4">
           <div
             v-for="week in weeklyVolume"
             :key="week.week"
@@ -254,7 +231,14 @@ function formatDuration(minutes: number) {
 
       <!-- Muscle Distribution -->
       <NCard title="Muscle Distribution">
-        <div class="space-y-4">
+        <div v-if="muscleDistribution.length === 0" class="py-8 text-center text-gray-500 dark:text-gray-400">
+          <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p>No muscle data yet</p>
+          <p class="text-sm mt-1">Log exercises to see muscle distribution</p>
+        </div>
+        <div v-else class="space-y-4">
           <div
             v-for="(item, index) in muscleDistribution"
             :key="item.muscle"

@@ -5,15 +5,8 @@ definePageMeta({
   middleware: ['auth'],
 })
 
-// Mock PR data
-const personalRecords = ref([
-  { id: '1', exercise: 'Bench Press', value: 100, unit: 'kg', date: '2024-01-08', improvement: 5 },
-  { id: '2', exercise: 'Squat', value: 140, unit: 'kg', date: '2024-01-06', improvement: 10 },
-  { id: '3', exercise: 'Deadlift', value: 180, unit: 'kg', date: '2024-01-04', improvement: 5 },
-  { id: '4', exercise: 'Overhead Press', value: 60, unit: 'kg', date: '2024-01-02', improvement: 2.5 },
-  { id: '5', exercise: 'Barbell Row', value: 80, unit: 'kg', date: '2023-12-28', improvement: 5 },
-  { id: '6', exercise: 'Pull-up', value: 15, unit: 'reps', date: '2023-12-25', improvement: 2 },
-])
+// Personal records (empty by default, will be populated from real data)
+const personalRecords = ref<{ id: string; exercise: string; value: number; unit: string; date: string; improvement: number }[]>([])
 
 const recentPRs = computed(() => {
   return [...personalRecords.value].sort((a, b) =>
@@ -35,6 +28,24 @@ function formatDate(dateStr: string) {
       <p class="text-gray-500 dark:text-gray-400 mt-1">Your all-time bests</p>
     </div>
 
+    <!-- No Data State -->
+    <div v-if="personalRecords.length === 0" class="card p-12 text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+        <svg class="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Personal Records Yet</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">Complete workouts and lift heavier to set your first personal records!</p>
+      <NuxtLink to="/workout/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-900 dark:bg-white text-white dark:text-primary-900 rounded-xl font-medium hover:opacity-90 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Start a Workout
+      </NuxtLink>
+    </div>
+
+    <template v-else>
     <!-- Stats Summary -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <NCard class="text-center">
@@ -43,14 +54,14 @@ function formatDate(dateStr: string) {
       </NCard>
       <NCard class="text-center">
         <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ recentPRs.length }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">This Month</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Recent PRs</p>
       </NCard>
       <NCard class="text-center">
-        <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">420</p>
+        <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">—</p>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Total (Big 3) kg</p>
       </NCard>
       <NCard class="text-center">
-        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">7</p>
+        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">—</p>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Day Streak</p>
       </NCard>
     </div>
@@ -117,5 +128,6 @@ function formatDate(dateStr: string) {
         </div>
       </NTabPane>
     </NTabs>
+    </template>
   </div>
 </template>

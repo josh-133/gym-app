@@ -16,20 +16,8 @@ interface Achievement {
   unlockedAt?: string
 }
 
-const achievements = ref<Achievement[]>([
-  { id: '1', name: 'First Workout', description: 'Complete your first workout', icon: '🏆', category: 'milestone', unlocked: true, progress: 100, unlockedAt: '2024-01-01' },
-  { id: '2', name: 'Week Warrior', description: 'Complete 5 workouts in a week', icon: '🔥', category: 'consistency', unlocked: true, progress: 100, unlockedAt: '2024-01-07' },
-  { id: '3', name: 'First PR', description: 'Set your first personal record', icon: '⭐', category: 'strength', unlocked: true, progress: 100, unlockedAt: '2024-01-05' },
-  { id: '4', name: 'Streak Starter', description: 'Maintain a 7-day workout streak', icon: '⚡', category: 'consistency', unlocked: true, progress: 100, unlockedAt: '2024-01-08' },
-  { id: '5', name: 'Monthly Master', description: 'Complete 20 workouts in a month', icon: '📅', category: 'consistency', unlocked: false, progress: 80 },
-  { id: '6', name: 'Streak Master', description: 'Maintain a 30-day workout streak', icon: '🔥', category: 'consistency', unlocked: false, progress: 40 },
-  { id: '7', name: 'Century Club', description: 'Complete 100 workouts', icon: '🎖️', category: 'milestone', unlocked: false, progress: 65 },
-  { id: '8', name: 'PR Hunter', description: 'Set 10 personal records', icon: '🎯', category: 'strength', unlocked: false, progress: 60 },
-  { id: '9', name: '100kg Bench', description: 'Bench press 100kg', icon: '💪', category: 'strength', unlocked: true, progress: 100, unlockedAt: '2024-01-08' },
-  { id: '10', name: 'Volume Rookie', description: 'Lift 10,000kg total volume', icon: '📈', category: 'endurance', unlocked: true, progress: 100, unlockedAt: '2024-01-03' },
-  { id: '11', name: 'Volume Pro', description: 'Lift 100,000kg total volume', icon: '📈', category: 'endurance', unlocked: false, progress: 45 },
-  { id: '12', name: 'Exercise Explorer', description: 'Try 20 different exercises', icon: '🧭', category: 'milestone', unlocked: false, progress: 75 },
-])
+// Achievements (empty by default, will be populated from real data)
+const achievements = ref<Achievement[]>([])
 
 const unlockedAchievements = computed(() => achievements.value.filter(a => a.unlocked))
 const lockedAchievements = computed(() => achievements.value.filter(a => !a.unlocked))
@@ -59,6 +47,22 @@ function formatDate(dateStr?: string) {
       <p class="text-gray-500 dark:text-gray-400 mt-1">Track your fitness milestones</p>
     </div>
 
+    <!-- No Data State -->
+    <div v-if="achievements.length === 0" class="card p-12 text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+        <span class="text-3xl">🏆</span>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Achievements Yet</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">Complete workouts and reach milestones to unlock achievements!</p>
+      <NuxtLink to="/workout/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-900 dark:bg-white text-white dark:text-primary-900 rounded-xl font-medium hover:opacity-90 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Start a Workout
+      </NuxtLink>
+    </div>
+
+    <template v-else>
     <!-- Stats -->
     <div class="grid grid-cols-3 gap-4">
       <NCard class="text-center">
@@ -133,5 +137,6 @@ function formatDate(dateStr?: string) {
         </NCard>
       </div>
     </div>
+    </template>
   </div>
 </template>

@@ -15,59 +15,26 @@ const timeRangeOptions = [
   { label: 'All Time', value: 'all' },
 ]
 
-// Mock cardio summary stats
+// Cardio stats (empty by default)
 const cardioStats = ref({
-  totalDuration: 1840, // minutes
-  totalDistance: 156.5, // km
-  totalCalories: 18500,
-  avgHeartRate: 142,
-  avgPace: 5.8, // min/km
-  sessionsCount: 24,
+  totalDuration: 0,
+  totalDistance: 0,
+  totalCalories: 0,
+  avgHeartRate: 0,
+  avgPace: 0,
+  sessionsCount: 0,
 })
 
-// Mock recent cardio sessions
-const recentSessions = ref([
-  { id: '1', type: 'Running', date: '2024-02-06', duration: 45, distance: 7.5, calories: 520, avgHR: 148, maxHR: 172, pace: 6.0 },
-  { id: '2', type: 'Cycling', date: '2024-02-04', duration: 60, distance: 25, calories: 480, avgHR: 135, maxHR: 158, pace: null },
-  { id: '3', type: 'Running', date: '2024-02-02', duration: 30, distance: 5.2, calories: 380, avgHR: 152, maxHR: 175, pace: 5.8 },
-  { id: '4', type: 'Swimming', date: '2024-01-30', duration: 40, distance: 1.5, calories: 420, avgHR: 138, maxHR: 160, pace: null },
-  { id: '5', type: 'Running', date: '2024-01-28', duration: 55, distance: 10, calories: 680, avgHR: 145, maxHR: 168, pace: 5.5 },
-])
+// Empty arrays (will be populated from real data)
+const recentSessions = ref<{ id: string; type: string; date: string; duration: number; distance: number; calories: number; avgHR: number; maxHR: number; pace: number | null }[]>([])
 
-// Mock weekly distance data
-const weeklyDistance = ref([
-  { week: 'Week 1', running: 15.2, cycling: 30, swimming: 2 },
-  { week: 'Week 2', running: 18.5, cycling: 25, swimming: 1.5 },
-  { week: 'Week 3', running: 12.8, cycling: 35, swimming: 2.5 },
-  { week: 'Week 4', running: 22.1, cycling: 28, swimming: 1.8 },
-])
+const weeklyDistance = ref<{ week: string; running: number; cycling: number; swimming: number }[]>([])
 
-// Heart rate zone data
-const heartRateZones = ref([
-  { zone: 'Zone 1', name: 'Recovery', range: '< 120 bpm', percentage: 15, color: 'from-gray-400 to-gray-500', time: 276 },
-  { zone: 'Zone 2', name: 'Fat Burn', range: '120-140 bpm', percentage: 35, color: 'from-success-400 to-success-500', time: 644 },
-  { zone: 'Zone 3', name: 'Cardio', range: '140-160 bpm', percentage: 30, color: 'from-secondary-400 to-secondary-500', time: 552 },
-  { zone: 'Zone 4', name: 'Threshold', range: '160-175 bpm', percentage: 15, color: 'from-warning-400 to-warning-500', time: 276 },
-  { zone: 'Zone 5', name: 'Peak', range: '> 175 bpm', percentage: 5, color: 'from-accent-500 to-energy-500', time: 92 },
-])
+const heartRateZones = ref<{ zone: string; name: string; range: string; percentage: number; color: string; time: number }[]>([])
 
-// Monthly pace trend
-const paceTrend = ref([
-  { date: 'Jan 1', pace: 6.2 },
-  { date: 'Jan 8', pace: 6.0 },
-  { date: 'Jan 15', pace: 5.9 },
-  { date: 'Jan 22', pace: 5.8 },
-  { date: 'Jan 29', pace: 5.7 },
-  { date: 'Feb 5', pace: 5.6 },
-])
+const paceTrend = ref<{ date: string; pace: number }[]>([])
 
-// Calories by activity type
-const caloriesByActivity = ref([
-  { type: 'Running', calories: 9800, percentage: 53 },
-  { type: 'Cycling', calories: 5200, percentage: 28 },
-  { type: 'Swimming', calories: 2100, percentage: 11 },
-  { type: 'Other', calories: 1400, percentage: 8 },
-])
+const caloriesByActivity = ref<{ type: string; calories: number; percentage: number }[]>([])
 
 function formatDuration(minutes: number) {
   const hours = Math.floor(minutes / 60)
@@ -100,8 +67,9 @@ function getActivityColor(type: string) {
   }
 }
 
-const maxPace = computed(() => Math.max(...paceTrend.value.map(p => p.pace)))
-const minPace = computed(() => Math.min(...paceTrend.value.map(p => p.pace)))
+const maxPace = computed(() => paceTrend.value.length > 0 ? Math.max(...paceTrend.value.map(p => p.pace)) : 0)
+const minPace = computed(() => paceTrend.value.length > 0 ? Math.min(...paceTrend.value.map(p => p.pace)) : 0)
+const hasData = computed(() => recentSessions.value.length > 0)
 </script>
 
 <template>
@@ -122,6 +90,24 @@ const minPace = computed(() => Math.min(...paceTrend.value.map(p => p.pace)))
       />
     </div>
 
+    <!-- No Data State -->
+    <div v-if="!hasData" class="card p-12 text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <svg class="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Cardio Data Yet</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">Log cardio workouts to see your heart rate zones, pace trends, and more!</p>
+      <NuxtLink to="/workout/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-900 dark:bg-white text-white dark:text-primary-900 rounded-xl font-medium hover:opacity-90 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Start a Workout
+      </NuxtLink>
+    </div>
+
+    <template v-else>
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       <NCard class="!bg-gradient-to-br from-accent-500 to-energy-500 shadow-xl">
@@ -396,5 +382,6 @@ const minPace = computed(() => Math.min(...paceTrend.value.map(p => p.pace)))
         </div>
       </div>
     </NCard>
+    </template>
   </div>
 </template>

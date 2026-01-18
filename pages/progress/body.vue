@@ -31,49 +31,30 @@ const newMeasurement = ref({
   rightThigh: null as number | null,
 })
 
-// Current stats
+// Current stats (empty/zero by default)
 const currentStats = ref({
-  weight: 82.5,
-  bodyFat: 15.2,
-  chest: 102,
-  waist: 84,
-  hips: 98,
-  leftArm: 38,
-  rightArm: 38.5,
-  leftThigh: 58,
-  rightThigh: 58.5,
+  weight: 0,
+  bodyFat: 0,
+  chest: 0,
+  waist: 0,
+  hips: 0,
+  leftArm: 0,
+  rightArm: 0,
+  leftThigh: 0,
+  rightThigh: 0,
 })
 
-// Weight history
-const weightHistory = ref([
-  { date: '2024-01-01', weight: 85.2, bodyFat: 17.5 },
-  { date: '2024-01-08', weight: 84.8, bodyFat: 17.2 },
-  { date: '2024-01-15', weight: 84.3, bodyFat: 16.8 },
-  { date: '2024-01-22', weight: 83.9, bodyFat: 16.5 },
-  { date: '2024-01-29', weight: 83.5, bodyFat: 16.1 },
-  { date: '2024-02-05', weight: 82.8, bodyFat: 15.6 },
-  { date: '2024-02-12', weight: 82.5, bodyFat: 15.2 },
-])
+// Empty arrays (will be populated from real data)
+const weightHistory = ref<{ date: string; weight: number; bodyFat: number }[]>([])
 
-// Body measurements history
-const measurementsHistory = ref([
-  { date: '2024-01-01', chest: 100, waist: 88, hips: 100, arms: 36.5, thighs: 56 },
-  { date: '2024-01-15', chest: 101, waist: 87, hips: 99, arms: 37, thighs: 57 },
-  { date: '2024-02-01', chest: 101.5, waist: 85, hips: 98.5, arms: 37.5, thighs: 57.5 },
-  { date: '2024-02-12', chest: 102, waist: 84, hips: 98, arms: 38, thighs: 58 },
-])
+const measurementsHistory = ref<{ date: string; chest: number; waist: number; hips: number; arms: number; thighs: number }[]>([])
 
-// Progress photos (mock)
-const progressPhotos = ref([
-  { id: '1', date: '2024-02-10', url: null, type: 'front' },
-  { id: '2', date: '2024-01-15', url: null, type: 'front' },
-  { id: '3', date: '2024-01-01', url: null, type: 'front' },
-])
+const progressPhotos = ref<{ id: string; date: string; url: string | null; type: string }[]>([])
 
-// Goals
+// Goals (default values)
 const goals = ref({
-  targetWeight: 80,
-  targetBodyFat: 12,
+  targetWeight: 0,
+  targetBodyFat: 0,
 })
 
 // Computed
@@ -100,8 +81,9 @@ const progressToGoalWeight = computed(() => {
   return totalLoss > 0 ? Math.min(100, Math.round((currentLoss / totalLoss) * 100)) : 0
 })
 
-const maxWeight = computed(() => Math.max(...weightHistory.value.map(h => h.weight)) + 2)
-const minWeight = computed(() => Math.min(...weightHistory.value.map(h => h.weight)) - 2)
+const maxWeight = computed(() => weightHistory.value.length > 0 ? Math.max(...weightHistory.value.map(h => h.weight)) + 2 : 100)
+const minWeight = computed(() => weightHistory.value.length > 0 ? Math.min(...weightHistory.value.map(h => h.weight)) - 2 : 60)
+const hasData = computed(() => weightHistory.value.length > 0 || currentStats.value.weight > 0)
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -151,6 +133,26 @@ function saveMeasurement() {
       </div>
     </div>
 
+    <!-- No Data State -->
+    <div v-if="!hasData" class="card p-12 text-center">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+        <svg class="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Body Stats Yet</h3>
+      <p class="text-gray-500 dark:text-gray-400 mb-6">Track your weight, body fat, and measurements to monitor your progress!</p>
+      <NButton type="primary" @click="openAddModal('all')">
+        <template #icon>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+        </template>
+        Add Your First Entry
+      </NButton>
+    </div>
+
+    <template v-else>
     <!-- Current Stats Overview -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <NCard class="!bg-gradient-to-br from-primary-500 to-accent-500 shadow-xl">
@@ -504,5 +506,6 @@ function saveMeasurement() {
         </div>
       </template>
     </NModal>
+    </template>
   </div>
 </template>
