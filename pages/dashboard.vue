@@ -5,43 +5,31 @@ definePageMeta({
   middleware: ['auth'],
 })
 
+const { $supabase } = useNuxtApp()
 const auth = useAuth()
 
+// Loading state
+const loading = ref(true)
+
+// Stats with default values
 const stats = ref({
-  workoutsThisWeek: 4,
-  totalWorkouts: 127,
-  currentStreak: 12,
-  longestStreak: 21,
-  totalVolume: 45250,
-  prsThisMonth: 8,
+  workoutsThisWeek: 0,
+  totalWorkouts: 0,
+  currentStreak: 0,
+  totalVolume: 0,
+  prsThisMonth: 0,
 })
 
-const recentWorkouts = ref([
-  {
-    id: '1',
-    name: 'Push Day',
-    date: '2024-01-09',
-    duration: 65,
-    exercises: 6,
-    volume: 4520,
-  },
-  {
-    id: '2',
-    name: 'Pull Day',
-    date: '2024-01-08',
-    duration: 58,
-    exercises: 5,
-    volume: 3890,
-  },
-  {
-    id: '3',
-    name: 'Leg Day',
-    date: '2024-01-06',
-    duration: 72,
-    exercises: 7,
-    volume: 6120,
-  },
-])
+// Recent workouts from database
+interface RecentWorkout {
+  id: string
+  name: string
+  date: string
+  duration: number
+  exercises: number
+  volume: number
+}
+const recentWorkouts = ref<RecentWorkout[]>([])
 
 const quickActions = [
   { label: 'Push', icon: 'chest' },
@@ -49,6 +37,189 @@ const quickActions = [
   { label: 'Legs', icon: 'legs' },
   { label: 'Custom', icon: 'plus' },
 ]
+
+// Fetch dashboard data
+async function fetchDashboardData() {
+  if (!$supabase || !auth.user.value) {
+    loading.value = false
+    return
+  }
+
+  try {
+    const userId = auth.user.value.id
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay())
+    startOfWeek.setHours(0, 0, 0, 0)
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    // Fetch recent workouts with exercise count
+    const { data: workouts, error: workoutsError } = await $supabase
+      .from('workout_sessions')
+      .select(`
+        id,
+        name,
+        started_at,
+        duration_sec,
+        exercise_logs (
+          id,
+          sets (
+            weight_kg,
+            reps
+          )
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false })
+      .limit(5)
+
+    if (workoutsError) {
+      console.error('Error fetching workouts:', workoutsError)
+    } else if (workouts) {
+      recentWorkouts.value = workouts.map(w => {
+        // Calculate volume (sum of weight * reps for all sets)
+        let volume = 0
+        const exerciseCount = w.exercise_logs?.length || 0
+
+        w.exercise_logs?.forEach(log => {
+          log.sets?.forEach(set => {
+            if (set.weight_kg && set.reps) {
+              volume += set.weight_kg * set.reps
+            }
+          })
+        })
+
+        return {
+          id: w.id,
+          name: w.name,
+          date: w.started_at,
+          duration: Math.round((w.duration_sec || 0) / 60), // Convert to minutes
+          exercises: exerciseCount,
+          volume: Math.round(volume),
+        }
+      })
+    }
+
+    // Fetch total workouts count
+    const { count: totalCount } = await $supabase
+      .from('workout_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+
+    stats.value.totalWorkouts = totalCount || 0
+
+    // Fetch workouts this week
+    const { count: weekCount } = await $supabase
+      .from('workout_sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .gte('started_at', startOfWeek.toISOString())
+
+    stats.value.workoutsThisWeek = weekCount || 0
+
+    // Fetch PRs this month
+    const { count: prCount } = await $supabase
+      .from('personal_records')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('achieved_at', startOfMonth.toISOString())
+
+    stats.value.prsThisMonth = prCount || 0
+
+    // Calculate total volume this month
+    const { data: monthWorkouts } = await $supabase
+      .from('workout_sessions')
+      .select(`
+        exercise_logs (
+          sets (
+            weight_kg,
+            reps
+          )
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .gte('started_at', startOfMonth.toISOString())
+
+    let totalVolume = 0
+    monthWorkouts?.forEach(w => {
+      w.exercise_logs?.forEach(log => {
+        log.sets?.forEach(set => {
+          if (set.weight_kg && set.reps) {
+            totalVolume += set.weight_kg * set.reps
+          }
+        })
+      })
+    })
+    stats.value.totalVolume = Math.round(totalVolume)
+
+    // Calculate current streak
+    const { data: allWorkouts } = await $supabase
+      .from('workout_sessions')
+      .select('started_at')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false })
+
+    if (allWorkouts && allWorkouts.length > 0) {
+      let streak = 0
+      let currentDate = new Date()
+      currentDate.setHours(0, 0, 0, 0)
+
+      // Create a set of workout dates
+      const workoutDates = new Set(
+        allWorkouts.map(w => {
+          const d = new Date(w.started_at)
+          return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+        })
+      )
+
+      // Check if worked out today or yesterday to start streak
+      const todayStr = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`
+      const yesterday = new Date(currentDate)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`
+
+      if (workoutDates.has(todayStr) || workoutDates.has(yesterdayStr)) {
+        // Start from today or yesterday and count backwards
+        let checkDate = workoutDates.has(todayStr) ? currentDate : yesterday
+
+        while (true) {
+          const checkStr = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`
+          if (workoutDates.has(checkStr)) {
+            streak++
+            checkDate.setDate(checkDate.getDate() - 1)
+          } else {
+            break
+          }
+        }
+      }
+
+      stats.value.currentStreak = streak
+    }
+
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Fetch data on mount
+onMounted(() => {
+  fetchDashboardData()
+})
+
+// Refetch when user changes
+watch(() => auth.user.value?.id, () => {
+  if (auth.user.value) {
+    fetchDashboardData()
+  }
+})
 
 function formatDuration(minutes: number) {
   const hrs = Math.floor(minutes / 60)
@@ -225,8 +396,13 @@ function formatDate(dateStr: string) {
         </NuxtLink>
       </div>
 
+      <!-- Loading State -->
+      <div v-if="loading" class="flex items-center justify-center py-8">
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+      </div>
+
       <!-- Empty State -->
-      <div v-if="recentWorkouts.length === 0" class="text-center py-12">
+      <div v-else-if="recentWorkouts.length === 0" class="text-center py-12">
         <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 dark:bg-[#222222] flex items-center justify-center">
           <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h2m12 0h2M6 7v10M18 7v10M8 7h8M8 17h8M4 17h2m12 0h2" />
@@ -279,10 +455,16 @@ function formatDate(dateStr: string) {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
-          <div>
-            <h4 class="font-medium text-primary-900 dark:text-white mb-1">Great progress on bench press!</h4>
+          <div v-if="stats.totalWorkouts > 0">
+            <h4 class="font-medium text-primary-900 dark:text-white mb-1">Keep up the momentum!</h4>
             <p class="text-sm text-gray-500 dark:text-gray-400">
-              You've increased your bench press by 5kg over the last 4 weeks. Consider adding a deload week next week to optimize recovery.
+              You've completed {{ stats.totalWorkouts }} workout{{ stats.totalWorkouts !== 1 ? 's' : '' }}. Log more workouts to unlock personalized AI insights and recommendations.
+            </p>
+          </div>
+          <div v-else>
+            <h4 class="font-medium text-primary-900 dark:text-white mb-1">Start tracking your workouts</h4>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Complete your first workout to unlock AI-powered insights and personalized recommendations.
             </p>
           </div>
         </div>
