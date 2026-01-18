@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NCard, NButton, NForm, NFormItem, NInput, NSelect, NAvatar, NTabs, NTabPane, NDivider, NSwitch, NTag } from 'naive-ui'
+import { NCard, NButton, NForm, NFormItem, NInput, NSelect, NAvatar, NTabs, NTabPane, NDivider, NSwitch, NTag, NModal } from 'naive-ui'
 import PremiumBadge from '~/components/subscription/PremiumBadge.vue'
 
 definePageMeta({
@@ -8,9 +8,60 @@ definePageMeta({
 
 const auth = useAuth()
 const uiStore = useUIStore()
+const route = useRoute()
+const router = useRouter()
 const { isPremium, status, openCustomerPortal } = useSubscription()
 
+// Tab state - read from query parameter
+const activeTab = ref<string>('profile')
+
+// Set initial tab from query parameter
+onMounted(() => {
+  const tab = route.query.tab
+  if (tab === 'settings' || tab === 'profile') {
+    activeTab.value = tab
+  }
+})
+
+// Watch for route changes to update tab
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (tab === 'settings' || tab === 'profile') {
+      activeTab.value = tab
+    }
+  }
+)
+
+// Update URL when tab changes
+function handleTabChange(tabName: string) {
+  activeTab.value = tabName
+  router.replace({ query: { ...route.query, tab: tabName } })
+}
+
 const isManagingSubscription = ref(false)
+
+// Delete account confirmation
+const showDeleteModal = ref(false)
+const deleteConfirmText = ref('')
+const isDeleting = ref(false)
+
+async function handleDeleteAccount() {
+  if (deleteConfirmText.value !== 'DELETE') return
+
+  isDeleting.value = true
+  try {
+    // In a real app, call an API to delete the account
+    // For now, just sign out
+    await auth.signOut()
+    await navigateTo('/login')
+  } catch (error) {
+    console.error('Delete account error:', error)
+  } finally {
+    isDeleting.value = false
+    showDeleteModal.value = false
+  }
+}
 
 async function handleManageSubscription() {
   isManagingSubscription.value = true
@@ -137,7 +188,7 @@ async function handleSignOut() {
     </NCard>
 
     <!-- Tabs -->
-    <NTabs type="line" animated>
+    <NTabs type="line" animated :value="activeTab" @update:value="handleTabChange">
       <!-- Profile Tab -->
       <NTabPane name="profile" tab="Profile">
         <NCard class="mt-4">
@@ -279,7 +330,7 @@ async function handleSignOut() {
                   Permanently delete your account and all data
                 </p>
               </div>
-              <NButton type="error" ghost>
+              <NButton type="error" ghost @click="showDeleteModal = true">
                 Delete
               </NButton>
             </div>
@@ -287,6 +338,48 @@ async function handleSignOut() {
         </div>
       </NTabPane>
     </NTabs>
+
+    <!-- Delete Account Confirmation Modal -->
+    <NModal
+      v-model:show="showDeleteModal"
+      preset="card"
+      title="Delete Account"
+      style="width: 90%; max-width: 450px;"
+    >
+      <div class="space-y-4">
+        <div class="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+          <p class="text-red-700 dark:text-red-400 font-medium">Warning: This action cannot be undone</p>
+          <p class="text-red-600 dark:text-red-500 text-sm mt-1">
+            All your data including workouts, progress, and settings will be permanently deleted.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Type <span class="font-mono font-bold">DELETE</span> to confirm
+          </label>
+          <NInput
+            v-model:value="deleteConfirmText"
+            placeholder="Type DELETE to confirm"
+          />
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <NButton block @click="showDeleteModal = false; deleteConfirmText = ''">
+            Cancel
+          </NButton>
+          <NButton
+            type="error"
+            block
+            :disabled="deleteConfirmText !== 'DELETE'"
+            :loading="isDeleting"
+            @click="handleDeleteAccount"
+          >
+            Delete My Account
+          </NButton>
+        </div>
+      </div>
+    </NModal>
     </template>
   </div>
 </template>

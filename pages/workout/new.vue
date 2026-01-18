@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane } from 'naive-ui'
+import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane, NDatePicker } from 'naive-ui'
 import type { Exercise } from '~/types/database'
 import RestTimer from '~/components/workout/RestTimer.vue'
 
@@ -12,9 +12,11 @@ const { addWorkout: saveWorkout } = useWorkoutHistory()
 const router = useRouter()
 const route = useRoute()
 
-// Workout name
+// Workout name and date
 const workoutName = ref('')
 const showExercisePicker = ref(false)
+const showFinishModal = ref(false)
+const workoutDate = ref<number>(Date.now()) // Timestamp for date picker
 
 // Mock templates for demo - in real app, fetch from Supabase
 interface WorkoutTemplate {
@@ -166,8 +168,15 @@ function formatDate(dateStr?: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// Handle finishing workout and saving it
-async function finishWorkout() {
+// Handle finishing workout - show modal to confirm date
+function finishWorkout() {
+  // Reset date to today when opening modal
+  workoutDate.value = Date.now()
+  showFinishModal.value = true
+}
+
+// Confirm and save the workout
+async function confirmFinishWorkout() {
   const result = await workoutStore.endWorkout()
   if (result) {
     // Calculate total volume
@@ -180,11 +189,14 @@ async function finishWorkout() {
       }, 0)
     }, 0)
 
+    // Use selected date or current time
+    const selectedDate = new Date(workoutDate.value).toISOString()
+
     // Save to history
     saveWorkout({
       id: result.session.id,
       name: result.session.name,
-      date: result.session.started_at,
+      date: selectedDate,
       duration: result.session.duration_sec || 0,
       exercises: result.exerciseLogs.map(log => ({
         name: log.exercise.name,
@@ -199,9 +211,15 @@ async function finishWorkout() {
       notes: result.session.notes,
     })
 
+    showFinishModal.value = false
     // Navigate to workout history
     router.push('/workout')
   }
+}
+
+// Date validation - can't select future dates
+function disableFutureDates(ts: number) {
+  return ts > Date.now()
 }
 
 // Check if there's an active workout
@@ -500,6 +518,44 @@ onMounted(() => {
             {{ formatMuscleGroups(exercise.muscle_groups) }}
           </div>
         </button>
+      </div>
+    </NModal>
+
+    <!-- Finish Workout Modal -->
+    <NModal
+      v-model:show="showFinishModal"
+      preset="card"
+      title="Save Workout"
+      style="width: 90%; max-width: 400px;"
+    >
+      <div class="space-y-4">
+        <p class="text-gray-600 dark:text-gray-400">
+          When did you complete this workout?
+        </p>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Workout Date
+          </label>
+          <NDatePicker
+            v-model:value="workoutDate"
+            type="date"
+            :is-date-disabled="disableFutureDates"
+            class="w-full"
+          />
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            You can log workouts from the past
+          </p>
+        </div>
+
+        <div class="flex gap-3 pt-2">
+          <NButton block @click="showFinishModal = false">
+            Cancel
+          </NButton>
+          <NButton type="primary" block @click="confirmFinishWorkout">
+            Save Workout
+          </NButton>
+        </div>
       </div>
     </NModal>
   </div>
