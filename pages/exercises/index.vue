@@ -1,22 +1,15 @@
 <script setup lang="ts">
 import { NCard, NButton, NInput, NSelect, NEmpty, NTag } from 'naive-ui'
-import type { Exercise, MuscleGroup, ExerciseCategory } from '~/types/database'
+import { EXERCISE_LIBRARY, type ExerciseDefinition, type MuscleGroup, type ExerciseCategory } from '~/utils/exercises'
 
 definePageMeta({
   middleware: ['auth'],
 })
 
-// Mock exercises for demo
-const exercises = ref<Exercise[]>([
-  { id: '1', name: 'Bench Press', category: 'strength', muscle_groups: ['chest', 'triceps', 'shoulders'], equipment: ['barbell', 'bench'], is_compound: true, is_system: true, user_id: null, description: 'Classic compound movement for chest development', difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '2', name: 'Squat', category: 'strength', muscle_groups: ['quads', 'glutes', 'hamstrings'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: 'King of leg exercises', difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '3', name: 'Deadlift', category: 'strength', muscle_groups: ['back', 'glutes', 'hamstrings'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: 'Full body compound lift', difficulty: 'advanced', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '4', name: 'Pull-up', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['pull_up_bar'], is_compound: true, is_system: true, user_id: null, description: 'Bodyweight back builder', difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '5', name: 'Overhead Press', category: 'strength', muscle_groups: ['shoulders', 'triceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: 'Shoulder strength and stability', difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '6', name: 'Barbell Row', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: 'Horizontal pulling movement', difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '7', name: 'Running', category: 'cardio', muscle_groups: ['quads', 'calves', 'glutes'], equipment: ['treadmill'], is_compound: false, is_system: true, user_id: null, description: 'Classic cardio exercise', difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '8', name: 'Cycling', category: 'cardio', muscle_groups: ['quads', 'hamstrings', 'calves'], equipment: ['bike'], is_compound: false, is_system: true, user_id: null, description: 'Low impact cardio', difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-])
+// Use the exercise library (excluding warmup exercises from main list)
+const exercises = computed(() => {
+  return EXERCISE_LIBRARY.filter(ex => ex.category !== 'warmup')
+})
 
 const search = ref('')
 const categoryFilter = ref<ExerciseCategory | null>(null)
@@ -47,10 +40,10 @@ const filteredExercises = computed(() => {
   return exercises.value.filter(e => {
     const matchesSearch = !search.value ||
       e.name.toLowerCase().includes(search.value.toLowerCase()) ||
-      e.muscle_groups.some(m => m.includes(search.value.toLowerCase()))
+      e.muscleGroups.some(m => m.includes(search.value.toLowerCase()))
 
     const matchesCategory = !categoryFilter.value || e.category === categoryFilter.value
-    const matchesMuscle = !muscleFilter.value || e.muscle_groups.includes(muscleFilter.value)
+    const matchesMuscle = !muscleFilter.value || e.muscleGroups.includes(muscleFilter.value)
 
     return matchesSearch && matchesCategory && matchesMuscle
   })
@@ -85,18 +78,8 @@ function getDifficultyColor(difficulty: string | null) {
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Exercise Library</h1>
-        <p class="text-gray-500 dark:text-gray-400 mt-1">Browse and search exercises</p>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Browse and search {{ exercises.length }} exercises</p>
       </div>
-      <NuxtLink to="/exercises/new">
-        <NButton type="primary">
-          <template #icon>
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-            </svg>
-          </template>
-          Add Exercise
-        </NButton>
-      </NuxtLink>
     </div>
 
     <!-- Filters -->
@@ -163,24 +146,26 @@ function getDifficultyColor(difficulty: string | null) {
           <h3 class="font-semibold text-gray-900 dark:text-white mb-1">
             {{ exercise.name }}
           </h3>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">
-            {{ exercise.description || 'No description available' }}
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+            <span v-if="exercise.isCompound">Compound</span>
+            <span v-else>Isolation</span>
+            · {{ exercise.difficulty }}
           </p>
 
           <!-- Tags -->
           <div class="flex flex-wrap gap-1">
             <span
-              v-for="muscle in formatMuscleGroups(exercise.muscle_groups)"
+              v-for="muscle in formatMuscleGroups(exercise.muscleGroups)"
               :key="muscle"
               class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded-full capitalize"
             >
               {{ muscle }}
             </span>
             <span
-              v-if="exercise.muscle_groups.length > 3"
+              v-if="exercise.muscleGroups.length > 3"
               class="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs rounded-full"
             >
-              +{{ exercise.muscle_groups.length - 3 }}
+              +{{ exercise.muscleGroups.length - 3 }}
             </span>
           </div>
         </NCard>
