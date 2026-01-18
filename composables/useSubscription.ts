@@ -10,7 +10,6 @@ interface SubscriptionState {
 
 export function useSubscription() {
   const { session } = useAuth()
-  const supabase = useSupabaseClient()
 
   const state = useState<SubscriptionState>('subscription', () => ({
     status: 'free',
