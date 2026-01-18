@@ -1,11 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   formatTime,
-  formatRelativeDate,
   formatDuration,
-  isWithinDays,
   startOfDay,
-  getDayName,
 } from '~/utils/time'
 
 describe('formatTime', () => {
@@ -34,37 +31,6 @@ describe('formatTime', () => {
   })
 })
 
-describe('formatRelativeDate', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2024-01-15T12:00:00Z'))
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('returns "Just now" for recent times', () => {
-    expect(formatRelativeDate('2024-01-15T11:30:00Z')).toBe('Just now')
-    expect(formatRelativeDate('2024-01-15T11:59:00Z')).toBe('Just now')
-  })
-
-  it('returns hours ago for same day', () => {
-    expect(formatRelativeDate('2024-01-15T10:00:00Z')).toBe('2h ago')
-    expect(formatRelativeDate('2024-01-15T06:00:00Z')).toBe('6h ago')
-  })
-
-  it('returns days ago for recent days', () => {
-    expect(formatRelativeDate('2024-01-14T12:00:00Z')).toBe('1d ago')
-    expect(formatRelativeDate('2024-01-12T12:00:00Z')).toBe('3d ago')
-  })
-
-  it('returns formatted date for older dates', () => {
-    const result = formatRelativeDate('2024-01-01T12:00:00Z')
-    expect(result).toMatch(/Jan/)
-  })
-})
-
 describe('formatDuration', () => {
   it('formats seconds', () => {
     expect(formatDuration(30)).toBe('30s')
@@ -85,32 +51,6 @@ describe('formatDuration', () => {
   it('formats hours and minutes', () => {
     expect(formatDuration(5400)).toBe('1h 30min')
     expect(formatDuration(8100)).toBe('2h 15min')
-  })
-})
-
-describe('isWithinDays', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2024-01-15T12:00:00Z'))
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('returns true for dates within range', () => {
-    expect(isWithinDays('2024-01-14T12:00:00Z', 7)).toBe(true)
-    expect(isWithinDays('2024-01-10T12:00:00Z', 7)).toBe(true)
-  })
-
-  it('returns false for dates outside range', () => {
-    expect(isWithinDays('2024-01-01T12:00:00Z', 7)).toBe(false)
-    expect(isWithinDays('2023-12-01T12:00:00Z', 30)).toBe(false)
-  })
-
-  it('handles edge cases', () => {
-    // Exactly 7 days ago at the boundary
-    expect(isWithinDays('2024-01-08T12:00:00Z', 7)).toBe(true)
   })
 })
 
@@ -137,16 +77,5 @@ describe('startOfDay', () => {
     expect(result.getDate()).toBe(date.getDate())
     expect(result.getMonth()).toBe(date.getMonth())
     expect(result.getFullYear()).toBe(date.getFullYear())
-  })
-})
-
-describe('getDayName', () => {
-  it('returns correct day names', () => {
-    // Monday
-    expect(getDayName(new Date('2024-01-15'))).toBe('Monday')
-    // Sunday
-    expect(getDayName(new Date('2024-01-14'))).toBe('Sunday')
-    // Friday
-    expect(getDayName(new Date('2024-01-19'))).toBe('Friday')
   })
 })

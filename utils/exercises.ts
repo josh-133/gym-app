@@ -728,15 +728,6 @@ export function getExercisesForMuscleGroups(
 }
 
 /**
- * Get exercises by category
- */
-export function getExercisesByCategory(
-  category: ExerciseCategory
-): ExerciseDefinition[] {
-  return EXERCISE_LIBRARY.filter((exercise) => exercise.category === category)
-}
-
-/**
  * Map workout types to target muscle groups
  */
 export const WORKOUT_TYPE_MUSCLES: Record<string, MuscleGroup[]> = {

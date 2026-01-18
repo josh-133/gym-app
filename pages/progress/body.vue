@@ -99,8 +99,7 @@ function openAddModal(type: string) {
 }
 
 function saveMeasurement() {
-  // In real app, save to Supabase
-  console.log('Saving:', newMeasurement.value)
+  // TODO: Save to Supabase when backend is implemented
   showAddModal.value = false
 }
 </script>

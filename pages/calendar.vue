@@ -69,8 +69,9 @@ const calendarDays = computed(() => {
 })
 
 // Map workouts to dates
+type Workout = typeof workouts.value[number]
 const workoutsByDate = computed(() => {
-  const map = new Map<string, typeof workouts.value>()
+  const map = new Map<string, Workout[]>()
 
   workouts.value.forEach(workout => {
     const dateKey = new Date(workout.date).toDateString()
