@@ -16,6 +16,14 @@ export function useAuth() {
       return
     }
 
+    // If already initialized and we have a user, just ensure profile is loaded
+    if (!loading.value && user.value) {
+      if (!profile.value) {
+        await fetchProfile()
+      }
+      return
+    }
+
     try {
       const { data: { session: currentSession } } = await $supabase.auth.getSession()
       if (currentSession) {

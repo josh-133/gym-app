@@ -94,6 +94,12 @@ async function handleSignOut() {
 
 <template>
   <div class="max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <!-- Loading State -->
+    <div v-if="auth.loading.value" class="flex items-center justify-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+    </div>
+
+    <template v-else>
     <!-- Profile Header -->
     <NCard>
       <div class="flex flex-col sm:flex-row items-center gap-6">
@@ -281,5 +287,6 @@ async function handleSignOut() {
         </div>
       </NTabPane>
     </NTabs>
+    </template>
   </div>
 </template>
