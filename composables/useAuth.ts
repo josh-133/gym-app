@@ -51,13 +51,22 @@ export function useAuth() {
   async function fetchProfile() {
     if (!$supabase || !user.value) return
 
-    const { data } = await $supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.value.id)
-      .single()
+    try {
+      const { data, error } = await $supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.value.id)
+        .single()
 
-    profile.value = data
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return
+      }
+
+      profile.value = data
+    } catch (err) {
+      console.error('Exception fetching profile:', err)
+    }
   }
 
   async function signUp(email: string, password: string, username: string) {
