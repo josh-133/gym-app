@@ -482,8 +482,9 @@ async function saveMeasurement() {
         </table>
       </div>
     </NCard>
+    </template>
 
-    <!-- Add Measurement Modal -->
+    <!-- Add Measurement Modal (outside conditional templates so it always renders) -->
     <NModal
       v-model:show="showAddModal"
       preset="card"
@@ -549,6 +550,5 @@ async function saveMeasurement() {
         </div>
       </template>
     </NModal>
-    </template>
   </div>
 </template>

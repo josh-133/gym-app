@@ -551,9 +551,9 @@ onMounted(() => {
     >
       <div class="space-y-6">
         <!-- Workout Summary -->
-        <div class="text-center py-4">
-          <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="text-center py-2">
+          <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
@@ -578,18 +578,17 @@ onMounted(() => {
             </p>
           </div>
         </div>
-      </div>
 
-      <template #footer>
-        <div class="flex gap-3">
+        <!-- Buttons inside content -->
+        <div class="flex gap-3 pt-2">
           <NButton block @click="showFinishModal = false">
-            Continue Workout
+            Continue
           </NButton>
           <NButton type="primary" block @click="confirmFinishWorkout">
             Save & Finish
           </NButton>
         </div>
-      </template>
+      </div>
     </NModal>
   </div>
 </template>
