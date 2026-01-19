@@ -545,11 +545,11 @@ onMounted(() => {
     <!-- Finish Workout Modal -->
     <NModal
       v-model:show="showFinishModal"
-      preset="dialog"
+      preset="card"
       title="Finish Workout"
-      style="width: 90%; max-width: 400px;"
+      :style="{ width: '90%', maxWidth: '400px' }"
     >
-      <div class="space-y-6">
+      <div class="space-y-4">
         <!-- Workout Summary -->
         <div class="text-center py-2">
           <div class="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
@@ -578,17 +578,18 @@ onMounted(() => {
             </p>
           </div>
         </div>
+      </div>
 
-        <!-- Buttons inside content -->
-        <div class="flex gap-3 pt-2">
-          <NButton block @click="showFinishModal = false">
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" @click="showFinishModal = false">
             Continue
           </NButton>
-          <NButton type="primary" block @click="confirmFinishWorkout">
+          <NButton type="primary" class="flex-1" @click="confirmFinishWorkout">
             Save & Finish
           </NButton>
         </div>
-      </div>
+      </template>
     </NModal>
   </div>
 </template>

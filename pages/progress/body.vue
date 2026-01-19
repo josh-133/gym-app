@@ -487,9 +487,9 @@ async function saveMeasurement() {
     <!-- Add Measurement Modal (outside conditional templates so it always renders) -->
     <NModal
       v-model:show="showAddModal"
-      preset="dialog"
+      preset="card"
       title="Add Body Stats"
-      style="width: 90%; max-width: 500px;"
+      :style="{ width: '90%', maxWidth: '500px' }"
     >
       <div class="space-y-4">
         <div>
@@ -543,11 +543,12 @@ async function saveMeasurement() {
         </div>
       </div>
 
-      <!-- Buttons inside content for better rendering -->
-      <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-        <NButton :disabled="saving" @click="showAddModal = false; resetForm()">Cancel</NButton>
-        <NButton type="primary" :loading="saving" @click="saveMeasurement">Save Measurement</NButton>
-      </div>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <NButton :disabled="saving" @click="showAddModal = false; resetForm()">Cancel</NButton>
+          <NButton type="primary" :loading="saving" @click="saveMeasurement">Save Measurement</NButton>
+        </div>
+      </template>
     </NModal>
   </div>
 </template>
