@@ -9,7 +9,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const workoutId = route.params.id as string
-const { getWorkout, updateWorkout, loadWorkouts } = useWorkoutHistory()
+const { workouts, getWorkout, updateWorkout, loadWorkouts } = useWorkoutHistory()
 
 // Form state
 const workoutName = ref('')
@@ -31,13 +31,10 @@ const saving = ref(false)
 const notFound = ref(false)
 const showExercisePicker = ref(false)
 const exerciseSearch = ref('')
+const dataLoaded = ref(false)
 
 // Load workout data
-onMounted(async () => {
-  loading.value = true
-  loadWorkouts()
-  await nextTick()
-
+function loadWorkoutData() {
   if (!workoutId || workoutId === 'undefined') {
     notFound.value = true
     loading.value = false
@@ -60,11 +57,36 @@ onMounted(async () => {
         completed: set.completed,
       })),
     }))
-  } else {
-    notFound.value = true
+    dataLoaded.value = true
+    loading.value = false
   }
+}
 
-  loading.value = false
+onMounted(() => {
+  loadWorkouts()
+  // Try to load immediately in case workouts are already in state
+  loadWorkoutData()
+
+  // If not loaded yet, wait for workouts to be populated
+  if (!dataLoaded.value) {
+    const stopWatch = watch(workouts, (newWorkouts) => {
+      if (newWorkouts.length > 0 && !dataLoaded.value) {
+        loadWorkoutData()
+        if (dataLoaded.value || notFound.value) {
+          stopWatch()
+        }
+      }
+    }, { immediate: true })
+
+    // Timeout to show not found if workouts never load
+    setTimeout(() => {
+      if (!dataLoaded.value && !notFound.value) {
+        notFound.value = true
+        loading.value = false
+        stopWatch()
+      }
+    }, 2000)
+  }
 })
 
 // Exercise library for picker
