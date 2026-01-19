@@ -5,23 +5,169 @@ definePageMeta({
   middleware: ['auth'],
 })
 
-// Stats (start at 0, no mock data)
-const stats = ref({
-  totalWorkouts: 0,
-  totalVolume: 0,
-  totalDuration: 0,
-  currentStreak: 0,
-  longestStreak: 0,
-  averageWorkoutDuration: 0,
-  workoutsThisWeek: 0,
-  workoutsThisMonth: 0,
-  prsThisMonth: 0,
+const { workouts, loadWorkouts } = useWorkoutHistory()
+
+// Load workouts on mount
+onMounted(() => {
+  loadWorkouts()
 })
 
-// Empty arrays for charts (will be populated from real data)
-const weeklyVolume = ref<{ week: string; volume: number }[]>([])
+// Computed stats from workout history
+const stats = computed(() => {
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay())
+  startOfWeek.setHours(0, 0, 0, 0)
 
-const muscleDistribution = ref<{ muscle: string; percentage: number }[]>([])
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  // Calculate total volume from all workouts
+  const totalVolume = workouts.value.reduce((sum, w) => sum + (w.volume || 0), 0)
+
+  // Calculate total duration (convert seconds to minutes)
+  const totalDuration = workouts.value.reduce((sum, w) => sum + Math.floor((w.duration || 0) / 60), 0)
+
+  // Count workouts this week
+  const workoutsThisWeek = workouts.value.filter(w => {
+    const workoutDate = new Date(w.date)
+    return workoutDate >= startOfWeek
+  }).length
+
+  // Count workouts this month
+  const workoutsThisMonth = workouts.value.filter(w => {
+    const workoutDate = new Date(w.date)
+    return workoutDate >= startOfMonth
+  }).length
+
+  // Calculate current streak (consecutive days with workouts)
+  let currentStreak = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Sort workouts by date descending
+  const sortedWorkouts = [...workouts.value].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  )
+
+  // Get unique workout dates
+  const workoutDates = new Set(
+    sortedWorkouts.map(w => {
+      const d = new Date(w.date)
+      d.setHours(0, 0, 0, 0)
+      return d.getTime()
+    })
+  )
+
+  // Check consecutive days starting from today or yesterday
+  let checkDate = new Date(today)
+  // If no workout today, start from yesterday
+  if (!workoutDates.has(checkDate.getTime())) {
+    checkDate.setDate(checkDate.getDate() - 1)
+  }
+
+  while (workoutDates.has(checkDate.getTime())) {
+    currentStreak++
+    checkDate.setDate(checkDate.getDate() - 1)
+  }
+
+  // Calculate average workout duration
+  const averageWorkoutDuration = workouts.value.length > 0
+    ? Math.floor(totalDuration / workouts.value.length)
+    : 0
+
+  return {
+    totalWorkouts: workouts.value.length,
+    totalVolume,
+    totalDuration,
+    currentStreak,
+    longestStreak: currentStreak, // Simplified - would need full history analysis for accurate longest
+    averageWorkoutDuration,
+    workoutsThisWeek,
+    workoutsThisMonth,
+    prsThisMonth: 0, // PRs not tracked yet
+  }
+})
+
+// Calculate weekly volume for the chart
+const weeklyVolume = computed(() => {
+  if (workouts.value.length === 0) return []
+
+  const weeks: { [key: string]: number } = {}
+  const now = new Date()
+
+  // Get last 4 weeks
+  for (let i = 0; i < 4; i++) {
+    const weekStart = new Date(now)
+    weekStart.setDate(now.getDate() - now.getDay() - (i * 7))
+    weekStart.setHours(0, 0, 0, 0)
+
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 7)
+
+    const weekLabel = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    weeks[weekLabel] = 0
+
+    workouts.value.forEach(w => {
+      const workoutDate = new Date(w.date)
+      if (workoutDate >= weekStart && workoutDate < weekEnd) {
+        weeks[weekLabel] += w.volume || 0
+      }
+    })
+  }
+
+  return Object.entries(weeks)
+    .map(([week, volume]) => ({ week, volume }))
+    .reverse()
+})
+
+// Calculate muscle distribution from workout exercises
+const muscleDistribution = computed(() => {
+  if (workouts.value.length === 0) return []
+
+  const muscleCounts: { [key: string]: number } = {}
+
+  workouts.value.forEach(workout => {
+    workout.exercises.forEach(exercise => {
+      // Try to match exercise name to muscle group
+      const name = exercise.name.toLowerCase()
+      if (name.includes('chest') || name.includes('bench') || name.includes('fly') || name.includes('press') && !name.includes('leg')) {
+        muscleCounts['Chest'] = (muscleCounts['Chest'] || 0) + 1
+      }
+      if (name.includes('back') || name.includes('row') || name.includes('pull') || name.includes('lat')) {
+        muscleCounts['Back'] = (muscleCounts['Back'] || 0) + 1
+      }
+      if (name.includes('shoulder') || name.includes('delt') || name.includes('raise')) {
+        muscleCounts['Shoulders'] = (muscleCounts['Shoulders'] || 0) + 1
+      }
+      if (name.includes('bicep') || name.includes('curl')) {
+        muscleCounts['Biceps'] = (muscleCounts['Biceps'] || 0) + 1
+      }
+      if (name.includes('tricep') || name.includes('pushdown') || name.includes('extension') && !name.includes('leg')) {
+        muscleCounts['Triceps'] = (muscleCounts['Triceps'] || 0) + 1
+      }
+      if (name.includes('leg') || name.includes('squat') || name.includes('quad')) {
+        muscleCounts['Legs'] = (muscleCounts['Legs'] || 0) + 1
+      }
+      if (name.includes('glute') || name.includes('hip')) {
+        muscleCounts['Glutes'] = (muscleCounts['Glutes'] || 0) + 1
+      }
+      if (name.includes('calf') || name.includes('calves')) {
+        muscleCounts['Calves'] = (muscleCounts['Calves'] || 0) + 1
+      }
+    })
+  })
+
+  const total = Object.values(muscleCounts).reduce((sum, count) => sum + count, 0)
+  if (total === 0) return []
+
+  return Object.entries(muscleCounts)
+    .map(([muscle, count]) => ({
+      muscle,
+      percentage: Math.round((count / total) * 100),
+    }))
+    .sort((a, b) => b.percentage - a.percentage)
+    .slice(0, 5)
+})
 
 // Analytics navigation cards
 const analyticsCards = [

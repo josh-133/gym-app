@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane, NDatePicker } from 'naive-ui'
+import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane, NDatePicker, NInputNumber, NSwitch } from 'naive-ui'
 import type { Exercise } from '~/types/database'
 import RestTimer from '~/components/workout/RestTimer.vue'
 import { EXERCISE_LIBRARY } from '~/utils/exercises'
@@ -18,6 +18,11 @@ const workoutName = ref('')
 const showExercisePicker = ref(false)
 const showFinishModal = ref(false)
 const workoutDate = ref<number>(Date.now()) // Timestamp for date picker
+
+// Manual duration input for past workouts
+const useManualDuration = ref(false)
+const manualDurationHours = ref(0)
+const manualDurationMinutes = ref(30)
 
 // Mock templates for demo - in real app, fetch from Supabase
 interface WorkoutTemplate {
@@ -192,12 +197,17 @@ async function confirmFinishWorkout() {
     // Use selected date or current time
     const selectedDate = new Date(workoutDate.value).toISOString()
 
+    // Calculate duration - use manual input if enabled, otherwise use tracked duration
+    const duration = useManualDuration.value
+      ? (manualDurationHours.value * 3600) + (manualDurationMinutes.value * 60)
+      : (result.session.duration_sec || 0)
+
     // Save to history
     saveWorkout({
       id: result.session.id,
       name: result.session.name,
       date: selectedDate,
-      duration: result.session.duration_sec || 0,
+      duration,
       exercises: result.exerciseLogs.map(log => ({
         name: log.exercise.name,
         sets: log.sets.map(set => ({
@@ -578,6 +588,38 @@ onMounted(() => {
             <p class="text-lg font-bold text-gray-900 dark:text-white">
               {{ workoutStore.exerciseLogs.reduce((sum, log) => sum + log.sets.filter(s => s.completed_at).length, 0) }}
             </p>
+          </div>
+        </div>
+
+        <!-- Manual Duration Toggle -->
+        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm text-gray-600 dark:text-gray-400">Set duration manually</span>
+            <NSwitch v-model:value="useManualDuration" />
+          </div>
+
+          <!-- Manual Duration Inputs -->
+          <div v-if="useManualDuration" class="flex items-center gap-3">
+            <div class="flex-1">
+              <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Hours</label>
+              <NInputNumber
+                v-model:value="manualDurationHours"
+                :min="0"
+                :max="12"
+                size="small"
+                class="w-full"
+              />
+            </div>
+            <div class="flex-1">
+              <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Minutes</label>
+              <NInputNumber
+                v-model:value="manualDurationMinutes"
+                :min="0"
+                :max="59"
+                size="small"
+                class="w-full"
+              />
+            </div>
           </div>
         </div>
       </div>
