@@ -9,10 +9,28 @@ definePageMeta({
 const route = useRoute()
 const exerciseId = route.params.id as string
 
-// Find exercise from the library
-const exercise = computed<ExerciseDefinition | null>(() => {
-  return EXERCISE_LIBRARY.find(ex => ex.id === exerciseId) || null
+const { customExercisesAsDefinitions, fetchCustomExercises } = useCustomExercises()
+
+// Fetch custom exercises on mount
+onMounted(() => {
+  fetchCustomExercises()
 })
+
+// Find exercise from the library or custom exercises
+const exercise = computed<ExerciseDefinition | null>(() => {
+  // First check the built-in library
+  const libraryExercise = EXERCISE_LIBRARY.find(ex => ex.id === exerciseId)
+  if (libraryExercise) return libraryExercise
+
+  // Then check custom exercises
+  const customExercise = customExercisesAsDefinitions.value.find(ex => ex.id === exerciseId)
+  if (customExercise) return customExercise
+
+  return null
+})
+
+// Check if this is a custom exercise
+const isCustom = computed(() => exerciseId.includes('-') && exerciseId.length > 20)
 
 // Empty history - would come from user's workout data in a real app
 const history = ref<{ date: string; sets: number; bestWeight: number; bestReps: number; volume: number }[]>([])
@@ -68,22 +86,25 @@ function getDifficultyColor(difficulty: string) {
           </NuxtLink>
           <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ exercise.name }}</h1>
           <div class="flex flex-wrap gap-2 mt-2">
+            <NTag v-if="isCustom" type="warning">Custom</NTag>
             <NTag :type="getDifficultyColor(exercise.difficulty)">{{ exercise.difficulty }}</NTag>
             <NTag>{{ exercise.category }}</NTag>
             <NTag v-if="exercise.isCompound" type="info">Compound</NTag>
             <NTag v-else type="default">Isolation</NTag>
           </div>
         </div>
-        <NuxtLink to="/workout/new">
-          <NButton type="primary">
-            <template #icon>
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-            </template>
-            Start Workout
-          </NButton>
-        </NuxtLink>
+        <div class="flex gap-2">
+          <NuxtLink to="/workout/new">
+            <NButton type="primary">
+              <template #icon>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </template>
+              Start Workout
+            </NButton>
+          </NuxtLink>
+        </div>
       </div>
 
       <!-- PR Card - only show if user has a personal record -->

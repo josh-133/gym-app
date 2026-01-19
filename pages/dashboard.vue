@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NProgress } from 'naive-ui'
+import { NButton, NProgress, NCard } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
@@ -7,6 +7,7 @@ definePageMeta({
 
 const { $supabase } = useNuxtApp()
 const auth = useAuth()
+const { activeGoals, fetchGoals, getProgressPercentage, getGoalTypeInfo } = useGoals()
 
 // Loading state
 const loading = ref(true)
@@ -212,6 +213,7 @@ async function fetchDashboardData() {
 // Fetch data on mount
 onMounted(() => {
   fetchDashboardData()
+  fetchGoals()
 })
 
 // Refetch when user changes
@@ -304,6 +306,40 @@ function formatDate(dateStr: string) {
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">New PRs</p>
         <p class="text-3xl font-bold text-accent-500">{{ stats.prsThisMonth }}</p>
         <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this month</p>
+      </div>
+    </div>
+
+    <!-- Goals Progress -->
+    <div v-if="activeGoals.length > 0" class="card p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">My Goals</h2>
+        <NuxtLink to="/goals" class="text-sm text-primary-900 dark:text-white font-medium hover:underline">
+          Manage
+        </NuxtLink>
+      </div>
+      <div class="space-y-4">
+        <div v-for="goal in activeGoals.slice(0, 3)" :key="goal.id" class="space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">{{ getGoalTypeInfo(goal.goal_type).icon }}</span>
+              <span class="text-sm font-medium text-gray-900 dark:text-white">{{ goal.title }}</span>
+            </div>
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+              {{ goal.current_value }} / {{ goal.target_value }} {{ goal.unit }}
+            </span>
+          </div>
+          <NProgress
+            type="line"
+            :percentage="getProgressPercentage(goal)"
+            :height="8"
+            :border-radius="4"
+            :fill-border-radius="4"
+            :status="getProgressPercentage(goal) >= 100 ? 'success' : 'default'"
+          />
+        </div>
+        <NuxtLink v-if="activeGoals.length > 3" to="/goals" class="block text-sm text-center text-indigo-600 dark:text-indigo-400 hover:underline mt-2">
+          View all {{ activeGoals.length }} goals
+        </NuxtLink>
       </div>
     </div>
 

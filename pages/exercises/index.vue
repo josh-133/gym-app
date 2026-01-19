@@ -1,15 +1,66 @@
 <script setup lang="ts">
-import { NCard, NButton, NInput, NSelect, NEmpty, NTag } from 'naive-ui'
-import { EXERCISE_LIBRARY, type ExerciseDefinition, type MuscleGroup, type ExerciseCategory } from '~/utils/exercises'
+import { NCard, NButton, NInput, NSelect, NEmpty, NTag, NModal, NForm, NFormItem, NCheckbox } from 'naive-ui'
+import { EXERCISE_LIBRARY, type ExerciseDefinition, type MuscleGroup, type ExerciseCategory, type Equipment } from '~/utils/exercises'
 
 definePageMeta({
   middleware: ['auth'],
 })
 
-// Use the exercise library (excluding warmup exercises from main list)
-const exercises = computed(() => {
-  return EXERCISE_LIBRARY.filter(ex => ex.category !== 'warmup')
+const { customExercisesAsDefinitions, fetchCustomExercises, addCustomExercise, deleteCustomExercise, loading: customLoading } = useCustomExercises()
+
+// Fetch custom exercises on mount
+onMounted(() => {
+  fetchCustomExercises()
 })
+
+// Combine library exercises with custom exercises
+const exercises = computed(() => {
+  const libraryExercises = EXERCISE_LIBRARY.filter(ex => ex.category !== 'warmup')
+  return [...customExercisesAsDefinitions.value, ...libraryExercises]
+})
+
+// Modal state
+const showAddModal = ref(false)
+const saving = ref(false)
+const newExercise = ref({
+  name: '',
+  category: 'strength' as ExerciseCategory,
+  muscleGroups: [] as MuscleGroup[],
+  equipment: [] as Equipment[],
+  difficulty: 'intermediate' as 'beginner' | 'intermediate' | 'advanced',
+  isCompound: false,
+})
+
+function resetForm() {
+  newExercise.value = {
+    name: '',
+    category: 'strength',
+    muscleGroups: [],
+    equipment: [],
+    difficulty: 'intermediate',
+    isCompound: false,
+  }
+}
+
+async function handleAddExercise() {
+  if (!newExercise.value.name.trim() || newExercise.value.muscleGroups.length === 0) return
+
+  saving.value = true
+  try {
+    await addCustomExercise(newExercise.value)
+    showAddModal.value = false
+    resetForm()
+  } catch (err) {
+    console.error('Error adding exercise:', err)
+  } finally {
+    saving.value = false
+  }
+}
+
+// Check if exercise is custom (UUID format vs slug format)
+function isCustomExercise(id: string) {
+  return id.includes('-') && id.length > 20
+}
 
 const search = ref('')
 const categoryFilter = ref<ExerciseCategory | null>(null)
@@ -34,6 +85,48 @@ const muscleOptions = [
   { label: 'Glutes', value: 'glutes' },
   { label: 'Calves', value: 'calves' },
   { label: 'Abs', value: 'abs' },
+]
+
+// Options for the add exercise form
+const muscleSelectOptions = [
+  { label: 'Chest', value: 'chest' },
+  { label: 'Back', value: 'back' },
+  { label: 'Lats', value: 'lats' },
+  { label: 'Shoulders', value: 'shoulders' },
+  { label: 'Biceps', value: 'biceps' },
+  { label: 'Triceps', value: 'triceps' },
+  { label: 'Forearms', value: 'forearms' },
+  { label: 'Quads', value: 'quads' },
+  { label: 'Hamstrings', value: 'hamstrings' },
+  { label: 'Glutes', value: 'glutes' },
+  { label: 'Calves', value: 'calves' },
+  { label: 'Abs', value: 'abs' },
+  { label: 'Lower Back', value: 'lower_back' },
+  { label: 'Traps', value: 'traps' },
+]
+
+const equipmentSelectOptions = [
+  { label: 'Barbell', value: 'barbell' },
+  { label: 'Dumbbell', value: 'dumbbell' },
+  { label: 'Kettlebell', value: 'kettlebell' },
+  { label: 'Cable', value: 'cable' },
+  { label: 'Machine', value: 'machine' },
+  { label: 'Bodyweight', value: 'bodyweight' },
+  { label: 'Resistance Band', value: 'resistance_band' },
+  { label: 'Bench', value: 'bench' },
+  { label: 'Pull-up Bar', value: 'pull_up_bar' },
+]
+
+const difficultySelectOptions = [
+  { label: 'Beginner', value: 'beginner' },
+  { label: 'Intermediate', value: 'intermediate' },
+  { label: 'Advanced', value: 'advanced' },
+]
+
+const categorySelectOptions = [
+  { label: 'Strength', value: 'strength' },
+  { label: 'Cardio', value: 'cardio' },
+  { label: 'Flexibility', value: 'flexibility' },
 ]
 
 const filteredExercises = computed(() => {
@@ -80,6 +173,14 @@ function getDifficultyColor(difficulty: string | null) {
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Exercise Library</h1>
         <p class="text-gray-500 dark:text-gray-400 mt-1">Browse and search {{ exercises.length }} exercises</p>
       </div>
+      <NButton type="primary" @click="showAddModal = true">
+        <template #icon>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+        </template>
+        Add Custom Exercise
+      </NButton>
     </div>
 
     <!-- Filters -->
@@ -133,6 +234,9 @@ function getDifficultyColor(difficulty: string | null) {
               </svg>
             </div>
             <div class="flex gap-1">
+              <NTag v-if="isCustomExercise(exercise.id)" type="warning" size="small">
+                Custom
+              </NTag>
               <NTag :type="getCategoryColor(exercise.category)" size="small">
                 {{ exercise.category }}
               </NTag>
@@ -180,5 +284,77 @@ function getDifficultyColor(difficulty: string | null) {
         </NButton>
       </template>
     </NEmpty>
+
+    <!-- Add Custom Exercise Modal -->
+    <NModal
+      v-model:show="showAddModal"
+      preset="card"
+      title="Add Custom Exercise"
+      :style="{ maxWidth: '500px' }"
+      :mask-closable="!saving"
+      :closable="!saving"
+    >
+      <NForm>
+        <NFormItem label="Exercise Name" required>
+          <NInput v-model:value="newExercise.name" placeholder="e.g., Cable Crossover" />
+        </NFormItem>
+
+        <NFormItem label="Category" required>
+          <NSelect
+            v-model:value="newExercise.category"
+            :options="categorySelectOptions"
+            placeholder="Select category"
+          />
+        </NFormItem>
+
+        <NFormItem label="Target Muscles" required>
+          <NSelect
+            v-model:value="newExercise.muscleGroups"
+            :options="muscleSelectOptions"
+            multiple
+            placeholder="Select muscle groups"
+          />
+        </NFormItem>
+
+        <NFormItem label="Equipment">
+          <NSelect
+            v-model:value="newExercise.equipment"
+            :options="equipmentSelectOptions"
+            multiple
+            placeholder="Select equipment (optional)"
+          />
+        </NFormItem>
+
+        <NFormItem label="Difficulty">
+          <NSelect
+            v-model:value="newExercise.difficulty"
+            :options="difficultySelectOptions"
+            placeholder="Select difficulty"
+          />
+        </NFormItem>
+
+        <NFormItem>
+          <NCheckbox v-model:checked="newExercise.isCompound">
+            Compound exercise (works multiple muscle groups)
+          </NCheckbox>
+        </NFormItem>
+      </NForm>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <NButton :disabled="saving" @click="showAddModal = false">
+            Cancel
+          </NButton>
+          <NButton
+            type="primary"
+            :loading="saving"
+            :disabled="!newExercise.name.trim() || newExercise.muscleGroups.length === 0"
+            @click="handleAddExercise"
+          >
+            Add Exercise
+          </NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
