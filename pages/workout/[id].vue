@@ -7,87 +7,50 @@ definePageMeta({
 
 const route = useRoute()
 const workoutId = route.params.id as string
+const { getWorkout, loadWorkouts } = useWorkoutHistory()
 
-// Mock workout data - in real app, fetch from Supabase
-const workout = ref({
-  id: workoutId,
-  name: 'Push Day',
-  status: 'completed',
-  started_at: '2024-01-09T09:00:00Z',
-  completed_at: '2024-01-09T10:05:00Z',
-  duration_sec: 3900,
-  rating: 4,
-  perceived_exertion: 7,
-  notes: 'Felt strong today. Hit a new PR on bench press!',
-  exercises: [
-    {
-      name: 'Bench Press',
-      sets: [
-        { set_number: 1, weight: 60, reps: 10, type: 'warmup' },
-        { set_number: 2, weight: 80, reps: 8, type: 'warmup' },
-        { set_number: 3, weight: 95, reps: 5, type: 'working' },
-        { set_number: 4, weight: 100, reps: 5, type: 'working', is_pr: true },
-        { set_number: 5, weight: 100, reps: 4, type: 'working' },
-      ],
-    },
-    {
-      name: 'Incline Dumbbell Press',
-      sets: [
-        { set_number: 1, weight: 30, reps: 10, type: 'working' },
-        { set_number: 2, weight: 32.5, reps: 9, type: 'working' },
-        { set_number: 3, weight: 32.5, reps: 8, type: 'working' },
-      ],
-    },
-    {
-      name: 'Cable Fly',
-      sets: [
-        { set_number: 1, weight: 15, reps: 12, type: 'working' },
-        { set_number: 2, weight: 15, reps: 12, type: 'working' },
-        { set_number: 3, weight: 15, reps: 10, type: 'working' },
-      ],
-    },
-    {
-      name: 'Overhead Press',
-      sets: [
-        { set_number: 1, weight: 40, reps: 10, type: 'working' },
-        { set_number: 2, weight: 45, reps: 8, type: 'working' },
-        { set_number: 3, weight: 45, reps: 7, type: 'working' },
-      ],
-    },
-    {
-      name: 'Lateral Raise',
-      sets: [
-        { set_number: 1, weight: 10, reps: 15, type: 'working' },
-        { set_number: 2, weight: 10, reps: 14, type: 'working' },
-        { set_number: 3, weight: 10, reps: 12, type: 'working' },
-      ],
-    },
-    {
-      name: 'Tricep Pushdown',
-      sets: [
-        { set_number: 1, weight: 25, reps: 12, type: 'working' },
-        { set_number: 2, weight: 27.5, reps: 10, type: 'working' },
-        { set_number: 3, weight: 27.5, reps: 10, type: 'working' },
-      ],
-    },
-  ],
-})
+// Workout data from history
+interface WorkoutData {
+  id: string
+  name: string
+  status: string
+  started_at: string
+  completed_at: string | null
+  duration_sec: number
+  rating: number | null
+  perceived_exertion: number | null
+  notes: string | null
+  exercises: {
+    name: string
+    sets: {
+      set_number: number
+      weight: number | null
+      reps: number | null
+      type: string
+      is_pr?: boolean
+    }[]
+  }[]
+}
 
-const loading = ref(false)
+const workout = ref<WorkoutData | null>(null)
+const loading = ref(true)
 const notFound = ref(false)
 
 // Computed stats
 const totalSets = computed(() => {
+  if (!workout.value) return 0
   return workout.value.exercises.reduce((sum, ex) => sum + ex.sets.length, 0)
 })
 
 const totalVolume = computed(() => {
+  if (!workout.value) return 0
   return workout.value.exercises.reduce((sum, ex) => {
-    return sum + ex.sets.reduce((setSum, set) => setSum + (set.weight * set.reps), 0)
+    return sum + ex.sets.reduce((setSum, set) => setSum + ((set.weight || 0) * (set.reps || 0)), 0)
   }, 0)
 })
 
 const prsHit = computed(() => {
+  if (!workout.value) return 0
   return workout.value.exercises.reduce((sum, ex) => {
     return sum + ex.sets.filter(s => s.is_pr).length
   }, 0)
@@ -95,12 +58,50 @@ const prsHit = computed(() => {
 
 onMounted(async () => {
   loading.value = true
-  await new Promise(resolve => setTimeout(resolve, 300))
-  loading.value = false
+
+  // Load workouts from localStorage first
+  loadWorkouts()
+
+  // Small delay to ensure state is hydrated
+  await nextTick()
 
   if (!workoutId || workoutId === 'undefined') {
     notFound.value = true
+    loading.value = false
+    return
   }
+
+  // Get the workout from history
+  const savedWorkout = getWorkout(workoutId)
+
+  if (savedWorkout) {
+    // Convert from SavedWorkout format to display format
+    workout.value = {
+      id: savedWorkout.id,
+      name: savedWorkout.name,
+      status: 'completed',
+      started_at: savedWorkout.date,
+      completed_at: savedWorkout.date,
+      duration_sec: savedWorkout.duration,
+      rating: savedWorkout.rating,
+      perceived_exertion: null,
+      notes: savedWorkout.notes,
+      exercises: savedWorkout.exercises.map(ex => ({
+        name: ex.name,
+        sets: ex.sets.map((set, index) => ({
+          set_number: index + 1,
+          weight: set.weight,
+          reps: set.reps,
+          type: 'working',
+          is_pr: false,
+        })),
+      })),
+    }
+  } else {
+    notFound.value = true
+  }
+
+  loading.value = false
 })
 
 function formatDuration(seconds: number) {
@@ -165,7 +166,7 @@ function getSetTypeColor(type: string) {
     </NCard>
 
     <!-- Workout Content -->
-    <template v-else>
+    <template v-else-if="workout">
       <!-- Header -->
       <div>
         <NuxtLink to="/workout" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline mb-2 inline-block">
@@ -178,7 +179,7 @@ function getSetTypeColor(type: string) {
               {{ formatDate(workout.started_at) }} at {{ formatTime(workout.started_at) }}
             </p>
           </div>
-          <div class="flex items-center gap-2">
+          <div v-if="workout.rating" class="flex items-center gap-2">
             <span class="text-yellow-500 text-lg">{{ getRatingStars(workout.rating) }}</span>
           </div>
         </div>
