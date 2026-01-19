@@ -545,7 +545,7 @@ onMounted(() => {
     <!-- Finish Workout Modal -->
     <NModal
       v-model:show="showFinishModal"
-      preset="card"
+      preset="dialog"
       title="Finish Workout"
       style="width: 90%; max-width: 400px;"
     >
