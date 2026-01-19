@@ -2,6 +2,7 @@
 import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane, NDatePicker } from 'naive-ui'
 import type { Exercise } from '~/types/database'
 import RestTimer from '~/components/workout/RestTimer.vue'
+import { EXERCISE_LIBRARY } from '~/utils/exercises'
 
 definePageMeta({
   middleware: ['auth'],
@@ -94,32 +95,33 @@ const templates = ref<WorkoutTemplate[]>([
   },
 ])
 
-// Mock exercises for demo
-const exercises: Exercise[] = [
-  { id: '1', name: 'Bench Press', category: 'strength', muscle_groups: ['chest', 'triceps', 'shoulders'], equipment: ['barbell', 'bench'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '2', name: 'Incline Dumbbell Press', category: 'strength', muscle_groups: ['chest', 'shoulders'], equipment: ['dumbbell', 'bench'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '3', name: 'Cable Fly', category: 'strength', muscle_groups: ['chest'], equipment: ['cable'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '4', name: 'Overhead Press', category: 'strength', muscle_groups: ['shoulders', 'triceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '5', name: 'Lateral Raise', category: 'strength', muscle_groups: ['shoulders'], equipment: ['dumbbell'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '6', name: 'Tricep Pushdown', category: 'strength', muscle_groups: ['triceps'], equipment: ['cable'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '7', name: 'Squat', category: 'strength', muscle_groups: ['quads', 'glutes', 'hamstrings'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '8', name: 'Deadlift', category: 'strength', muscle_groups: ['back', 'glutes', 'hamstrings'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'advanced', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '9', name: 'Pull-up', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['pull_up_bar'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '10', name: 'Barbell Row', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '11', name: 'Lat Pulldown', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['cable'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '12', name: 'Barbell Curl', category: 'strength', muscle_groups: ['biceps'], equipment: ['barbell'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '13', name: 'Romanian Deadlift', category: 'strength', muscle_groups: ['hamstrings', 'glutes'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '14', name: 'Leg Press', category: 'strength', muscle_groups: ['quads', 'glutes'], equipment: ['machine'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '15', name: 'Leg Curl', category: 'strength', muscle_groups: ['hamstrings'], equipment: ['machine'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '16', name: 'Leg Extension', category: 'strength', muscle_groups: ['quads'], equipment: ['machine'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-  { id: '17', name: 'Calf Raise', category: 'strength', muscle_groups: ['calves'], equipment: ['machine'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-]
+// Convert EXERCISE_LIBRARY to Exercise format for the picker
+const exercises = computed<Exercise[]>(() => {
+  return EXERCISE_LIBRARY
+    .filter(ex => ex.category !== 'warmup')
+    .map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      category: ex.category,
+      muscle_groups: ex.muscleGroups,
+      equipment: ex.equipment,
+      is_compound: ex.isCompound,
+      is_system: true,
+      user_id: null,
+      description: null,
+      difficulty: ex.difficulty,
+      instructions: [],
+      video_url: null,
+      image_url: null,
+      created_at: '',
+    }))
+})
 
 const exerciseSearch = ref('')
 const filteredExercises = computed(() => {
-  if (!exerciseSearch.value) return exercises
+  if (!exerciseSearch.value) return exercises.value
   const search = exerciseSearch.value.toLowerCase()
-  return exercises.filter(e =>
+  return exercises.value.filter(e =>
     e.name.toLowerCase().includes(search) ||
     e.muscle_groups.some(m => m.includes(search))
   )
