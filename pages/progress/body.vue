@@ -5,6 +5,13 @@ definePageMeta({
   middleware: ['auth'],
 })
 
+const { measurements, loading, fetchMeasurements, addMeasurement, latestMeasurement, weightHistory, measurementsHistory } = useBodyMeasurements()
+
+// Fetch measurements on mount
+onMounted(() => {
+  fetchMeasurements()
+})
+
 // Time range filter
 const timeRange = ref('3months')
 const timeRangeOptions = [
@@ -17,6 +24,7 @@ const timeRangeOptions = [
 
 // Add measurement modal
 const showAddModal = ref(false)
+const saving = ref(false)
 const measurementType = ref('weight')
 const newMeasurement = ref({
   date: Date.now(),
@@ -31,23 +39,36 @@ const newMeasurement = ref({
   rightThigh: null as number | null,
 })
 
-// Current stats (empty/zero by default)
-const currentStats = ref({
-  weight: 0,
-  bodyFat: 0,
-  chest: 0,
-  waist: 0,
-  hips: 0,
-  leftArm: 0,
-  rightArm: 0,
-  leftThigh: 0,
-  rightThigh: 0,
+function resetForm() {
+  newMeasurement.value = {
+    date: Date.now(),
+    weight: null,
+    bodyFat: null,
+    chest: null,
+    waist: null,
+    hips: null,
+    leftArm: null,
+    rightArm: null,
+    leftThigh: null,
+    rightThigh: null,
+  }
+}
+
+// Current stats from latest measurement
+const currentStats = computed(() => {
+  const latest = latestMeasurement.value
+  return {
+    weight: latest?.weight_kg || 0,
+    bodyFat: latest?.body_fat_percent || 0,
+    chest: latest?.chest_cm || 0,
+    waist: latest?.waist_cm || 0,
+    hips: latest?.hips_cm || 0,
+    leftArm: latest?.bicep_cm || 0,
+    rightArm: latest?.bicep_cm || 0,
+    leftThigh: latest?.thigh_cm || 0,
+    rightThigh: latest?.thigh_cm || 0,
+  }
 })
-
-// Empty arrays (will be populated from real data)
-const weightHistory = ref<{ date: string; weight: number; bodyFat: number }[]>([])
-
-const measurementsHistory = ref<{ date: string; chest: number; waist: number; hips: number; arms: number; thighs: number }[]>([])
 
 const progressPhotos = ref<{ id: string; date: string; url: string | null; type: string }[]>([])
 
@@ -83,7 +104,7 @@ const progressToGoalWeight = computed(() => {
 
 const maxWeight = computed(() => weightHistory.value.length > 0 ? Math.max(...weightHistory.value.map(h => h.weight)) + 2 : 100)
 const minWeight = computed(() => weightHistory.value.length > 0 ? Math.min(...weightHistory.value.map(h => h.weight)) - 2 : 60)
-const hasData = computed(() => weightHistory.value.length > 0 || currentStats.value.weight > 0)
+const hasData = computed(() => measurements.value.length > 0)
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -95,12 +116,30 @@ function getWeightPosition(weight: number) {
 
 function openAddModal(type: string) {
   measurementType.value = type
+  resetForm()
   showAddModal.value = true
 }
 
-function saveMeasurement() {
-  // TODO: Save to Supabase when backend is implemented
-  showAddModal.value = false
+async function saveMeasurement() {
+  saving.value = true
+  try {
+    await addMeasurement({
+      measured_at: new Date(newMeasurement.value.date).toISOString(),
+      weight_kg: newMeasurement.value.weight,
+      body_fat_percent: newMeasurement.value.bodyFat,
+      chest_cm: newMeasurement.value.chest,
+      waist_cm: newMeasurement.value.waist,
+      hips_cm: newMeasurement.value.hips,
+      bicep_cm: newMeasurement.value.leftArm || newMeasurement.value.rightArm,
+      thigh_cm: newMeasurement.value.leftThigh || newMeasurement.value.rightThigh,
+    })
+    showAddModal.value = false
+    resetForm()
+  } catch (err) {
+    console.error('Error saving measurement:', err)
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 
@@ -132,8 +171,13 @@ function saveMeasurement() {
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="flex items-center justify-center py-12">
+      <div class="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+    </div>
+
     <!-- No Data State -->
-    <div v-if="!hasData" class="card p-12 text-center">
+    <div v-else-if="!hasData" class="card p-12 text-center">
       <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
         <svg class="w-8 h-8 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -151,7 +195,7 @@ function saveMeasurement() {
       </NButton>
     </div>
 
-    <template v-else>
+    <template v-else-if="hasData">
     <!-- Current Stats Overview -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <NCard class="!bg-gradient-to-br from-primary-500 to-accent-500 shadow-xl">
@@ -500,8 +544,8 @@ function saveMeasurement() {
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <NButton @click="showAddModal = false">Cancel</NButton>
-          <NButton type="primary" @click="saveMeasurement">Save Measurement</NButton>
+          <NButton :disabled="saving" @click="showAddModal = false; resetForm()">Cancel</NButton>
+          <NButton type="primary" :loading="saving" @click="saveMeasurement">Save Measurement</NButton>
         </div>
       </template>
     </NModal>

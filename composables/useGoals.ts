@@ -46,9 +46,23 @@ export function useGoals() {
         .eq('user_id', user.value.id)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        // Handle case where table doesn't exist yet (404)
+        if (error.code === 'PGRST116' || error.message?.includes('404') || error.code === '42P01') {
+          console.warn('Goals table not found - migration may not have been run yet')
+          goals.value = []
+          return
+        }
+        throw error
+      }
       goals.value = data || []
-    } catch (err) {
+    } catch (err: any) {
+      // Gracefully handle table not existing
+      if (err?.status === 404 || err?.code === '42P01') {
+        console.warn('Goals table not found - migration may not have been run yet')
+        goals.value = []
+        return
+      }
       console.error('Error fetching goals:', err)
     } finally {
       loading.value = false

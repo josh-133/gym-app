@@ -168,10 +168,8 @@ function formatDate(dateStr?: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-// Handle finishing workout - show modal to confirm date
+// Handle finishing workout - show modal to confirm
 function finishWorkout() {
-  // Reset date to today when opening modal
-  workoutDate.value = Date.now()
   showFinishModal.value = true
 }
 
@@ -337,26 +335,43 @@ onMounted(() => {
                   Create a custom workout and add exercises as you go
                 </p>
 
-                <NInput
-                  v-model:value="workoutName"
-                  placeholder="Workout name (optional)"
-                  size="large"
-                  class="mb-4 max-w-xs mx-auto"
-                />
+                <div class="max-w-xs mx-auto space-y-4">
+                  <NInput
+                    v-model:value="workoutName"
+                    placeholder="Workout name (optional)"
+                    size="large"
+                  />
 
-                <NButton
-                  type="primary"
-                  size="large"
-                  @click="startWorkout"
-                >
-                  <template #icon>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </template>
-                  Start Empty Workout
-                </NButton>
+                  <div class="text-left">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Workout Date
+                    </label>
+                    <NDatePicker
+                      v-model:value="workoutDate"
+                      type="date"
+                      :is-date-disabled="disableFutureDates"
+                      class="w-full"
+                    />
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Log a past workout or start one for today
+                    </p>
+                  </div>
+
+                  <NButton
+                    type="primary"
+                    size="large"
+                    block
+                    @click="startWorkout"
+                  >
+                    <template #icon>
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </template>
+                    Start Empty Workout
+                  </NButton>
+                </div>
               </div>
             </NCard>
           </NTabPane>
@@ -373,7 +388,13 @@ onMounted(() => {
             <h1 class="text-xl font-bold gradient-text">
               {{ workoutStore.session?.name }}
             </h1>
-            <WorkoutWorkoutTimer />
+            <div class="flex items-center gap-3 mt-1">
+              <WorkoutWorkoutTimer />
+              <span class="text-xs text-gray-400">•</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">
+                {{ new Date(workoutDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }}
+              </span>
+            </div>
           </div>
           <div class="flex gap-2">
             <NButton @click="workoutStore.cancelWorkout">
@@ -525,38 +546,50 @@ onMounted(() => {
     <NModal
       v-model:show="showFinishModal"
       preset="card"
-      title="Save Workout"
+      title="Finish Workout"
       style="width: 90%; max-width: 400px;"
     >
-      <div class="space-y-4">
-        <p class="text-gray-600 dark:text-gray-400">
-          When did you complete this workout?
-        </p>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Workout Date
-          </label>
-          <NDatePicker
-            v-model:value="workoutDate"
-            type="date"
-            :is-date-disabled="disableFutureDates"
-            class="w-full"
-          />
-          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            You can log workouts from the past
+      <div class="space-y-6">
+        <!-- Workout Summary -->
+        <div class="text-center py-4">
+          <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg">
+            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Great workout!</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {{ workoutStore.exerciseLogs.length }} exercises completed
           </p>
         </div>
 
-        <div class="flex gap-3 pt-2">
-          <NButton block @click="showFinishModal = false">
-            Cancel
-          </NButton>
-          <NButton type="primary" block @click="confirmFinishWorkout">
-            Save Workout
-          </NButton>
+        <!-- Workout Stats -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Duration</p>
+            <p class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ Math.floor((workoutStore.session?.duration_sec || 0) / 60) }}m
+            </p>
+          </div>
+          <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-center">
+            <p class="text-xs text-gray-500 dark:text-gray-400">Sets</p>
+            <p class="text-lg font-bold text-gray-900 dark:text-white">
+              {{ workoutStore.exerciseLogs.reduce((sum, log) => sum + log.sets.filter(s => s.completed_at).length, 0) }}
+            </p>
+          </div>
         </div>
       </div>
+
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton block @click="showFinishModal = false">
+            Continue Workout
+          </NButton>
+          <NButton type="primary" block @click="confirmFinishWorkout">
+            Save & Finish
+          </NButton>
+        </div>
+      </template>
     </NModal>
   </div>
 </template>
