@@ -69,6 +69,17 @@ export function useWorkoutHistory() {
     }
   }
 
+  // Update an entire workout
+  function updateWorkout(id: string, updates: Partial<Omit<SavedWorkout, 'id'>>) {
+    const index = workouts.value.findIndex(w => w.id === id)
+    if (index !== -1) {
+      workouts.value[index] = { ...workouts.value[index], ...updates }
+      saveWorkouts()
+      return true
+    }
+    return false
+  }
+
   // Initialize on mount
   onMounted(() => {
     loadWorkouts()
@@ -80,6 +91,7 @@ export function useWorkoutHistory() {
     deleteWorkout,
     getWorkout,
     updateRating,
+    updateWorkout,
     loadWorkouts,
   }
 }
