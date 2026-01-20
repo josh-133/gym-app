@@ -16,7 +16,17 @@ interface SavedWorkout {
   notes: string | null
 }
 
+interface PersonalRecord {
+  id: string
+  exercise: string
+  weight: number
+  reps: number
+  date: string
+  workoutId: string
+}
+
 const STORAGE_KEY = 'gym-app-workout-history'
+const WEEKLY_GOAL_KEY = 'gym-app-weekly-goal'
 
 export function useWorkoutHistory() {
   const workouts = useState<SavedWorkout[]>('workoutHistory', () => [])
@@ -80,9 +90,89 @@ export function useWorkoutHistory() {
     return false
   }
 
+  // Weekly goal target
+  const weeklyGoalTarget = useState<number>('weeklyGoalTarget', () => 5)
+
+  function loadWeeklyGoal() {
+    if (import.meta.client) {
+      const stored = localStorage.getItem(WEEKLY_GOAL_KEY)
+      if (stored) {
+        const parsed = parseInt(stored, 10)
+        if (!isNaN(parsed) && parsed >= 1 && parsed <= 7) {
+          weeklyGoalTarget.value = parsed
+        }
+      }
+    }
+  }
+
+  function setWeeklyGoalTarget(target: number) {
+    if (target >= 1 && target <= 7) {
+      weeklyGoalTarget.value = target
+      if (import.meta.client) {
+        localStorage.setItem(WEEKLY_GOAL_KEY, target.toString())
+      }
+    }
+  }
+
+  // Calculate all personal records from workout history
+  // A PR is the best weight×reps combination for each exercise
+  function calculateAllPRs(): PersonalRecord[] {
+    const prMap = new Map<string, PersonalRecord>()
+
+    // Sort workouts by date (oldest first) so we track when PRs were set
+    const sortedWorkouts = [...workouts.value].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    )
+
+    for (const workout of sortedWorkouts) {
+      for (const exercise of workout.exercises) {
+        for (const set of exercise.sets) {
+          if (set.completed && set.weight && set.reps && set.weight > 0 && set.reps > 0) {
+            const key = exercise.name
+            const existing = prMap.get(key)
+
+            // Calculate "strength score" (weight × reps) for comparison
+            const newScore = set.weight * set.reps
+            const existingScore = existing ? existing.weight * existing.reps : 0
+
+            // New PR if higher score, or same score but more weight (stronger lift)
+            if (newScore > existingScore || (newScore === existingScore && set.weight > (existing?.weight || 0))) {
+              prMap.set(key, {
+                id: `${workout.id}-${exercise.name}-${set.weight}-${set.reps}`,
+                exercise: exercise.name,
+                weight: set.weight,
+                reps: set.reps,
+                date: workout.date,
+                workoutId: workout.id,
+              })
+            }
+          }
+        }
+      }
+    }
+
+    return Array.from(prMap.values())
+  }
+
+  // Get PRs achieved in the current month
+  function getPRsThisMonth(): PersonalRecord[] {
+    const allPRs = calculateAllPRs()
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    return allPRs.filter(pr => new Date(pr.date) >= startOfMonth)
+  }
+
+  // Get PR for a specific exercise
+  function getExercisePR(exerciseName: string): PersonalRecord | null {
+    const allPRs = calculateAllPRs()
+    return allPRs.find(pr => pr.exercise === exerciseName) || null
+  }
+
   // Initialize on mount
   onMounted(() => {
     loadWorkouts()
+    loadWeeklyGoal()
   })
 
   return {
@@ -93,5 +183,13 @@ export function useWorkoutHistory() {
     updateRating,
     updateWorkout,
     loadWorkouts,
+    // PR functions
+    calculateAllPRs,
+    getPRsThisMonth,
+    getExercisePR,
+    // Weekly goal
+    weeklyGoalTarget: readonly(weeklyGoalTarget),
+    setWeeklyGoalTarget,
+    loadWeeklyGoal,
   }
 }

@@ -5,13 +5,48 @@ definePageMeta({
   middleware: ['auth'],
 })
 
-// Personal records (empty by default, will be populated from real data)
-const personalRecords = ref<{ id: string; exercise: string; value: number; unit: string; date: string; improvement: number }[]>([])
+const { calculateAllPRs, loadWorkouts, getPRsThisMonth } = useWorkoutHistory()
 
+// Load workouts on mount
+onMounted(() => {
+  loadWorkouts()
+})
+
+// Personal records calculated from workout history
+const personalRecords = computed(() => {
+  const prs = calculateAllPRs()
+  return prs.map(pr => ({
+    id: pr.id,
+    exercise: pr.exercise,
+    value: pr.weight,
+    reps: pr.reps,
+    unit: 'kg',
+    date: pr.date,
+  })).sort((a, b) => a.exercise.localeCompare(b.exercise))
+})
+
+// Recent PRs (set this month)
 const recentPRs = computed(() => {
-  return [...personalRecords.value].sort((a, b) =>
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  ).slice(0, 5)
+  const prs = getPRsThisMonth()
+  return prs.map(pr => ({
+    id: pr.id,
+    exercise: pr.exercise,
+    value: pr.weight,
+    reps: pr.reps,
+    unit: 'kg',
+    date: pr.date,
+  })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+})
+
+// Calculate Big 3 total (bench, squat, deadlift)
+const big3Total = computed(() => {
+  const prs = calculateAllPRs()
+  const bench = prs.find(pr => pr.exercise.toLowerCase().includes('bench press'))
+  const squat = prs.find(pr => pr.exercise.toLowerCase().includes('squat') && !pr.exercise.toLowerCase().includes('split'))
+  const deadlift = prs.find(pr => pr.exercise.toLowerCase().includes('deadlift') && !pr.exercise.toLowerCase().includes('romanian'))
+
+  const total = (bench?.weight || 0) + (squat?.weight || 0) + (deadlift?.weight || 0)
+  return total > 0 ? total : null
 })
 
 function formatDate(dateStr: string) {
@@ -57,7 +92,7 @@ function formatDate(dateStr: string) {
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Recent PRs</p>
       </NCard>
       <NCard class="text-center">
-        <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">—</p>
+        <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{{ big3Total ? big3Total : '—' }}</p>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Total (Big 3) kg</p>
       </NCard>
       <NCard class="text-center">
@@ -91,9 +126,9 @@ function formatDate(dateStr: string) {
                 <p class="text-2xl font-bold text-gray-900 dark:text-white">
                   {{ pr.value }}<span class="text-sm font-normal text-gray-500 ml-1">{{ pr.unit }}</span>
                 </p>
-                <NTag type="success" size="small">
-                  +{{ pr.improvement }} {{ pr.unit }}
-                </NTag>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ pr.reps }} reps
+                </p>
               </div>
             </div>
           </NCard>
@@ -122,9 +157,14 @@ function formatDate(dateStr: string) {
                 <p class="text-2xl font-bold text-gray-900 dark:text-white">
                   {{ pr.value }}<span class="text-sm font-normal text-gray-500 ml-1">{{ pr.unit }}</span>
                 </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ pr.reps }} reps
+                </p>
               </div>
             </div>
           </NCard>
+
+          <NEmpty v-if="recentPRs.length === 0" description="No new PRs this month yet. Keep pushing!" />
         </div>
       </NTabPane>
     </NTabs>

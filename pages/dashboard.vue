@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NProgress, NCard } from 'naive-ui'
+import { NButton, NProgress, NCard, NModal, NInputNumber } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
@@ -7,7 +7,18 @@ definePageMeta({
 
 const auth = useAuth()
 const { activeGoals, fetchGoals, getProgressPercentage, getGoalTypeInfo } = useGoals()
-const { workouts: localWorkouts, loadWorkouts: loadLocalWorkouts } = useWorkoutHistory()
+const {
+  workouts: localWorkouts,
+  loadWorkouts: loadLocalWorkouts,
+  getPRsThisMonth,
+  weeklyGoalTarget,
+  setWeeklyGoalTarget,
+  loadWeeklyGoal,
+} = useWorkoutHistory()
+
+// Weekly goal edit modal
+const showWeeklyGoalModal = ref(false)
+const editingWeeklyGoal = ref(5)
 
 // Loading state
 const loading = ref(true)
@@ -64,7 +75,7 @@ const stats = computed(() => {
     totalWorkouts,
     currentStreak,
     totalVolume: Math.round(totalVolume),
-    prsThisMonth: 0, // PRs not tracked in localStorage yet
+    prsThisMonth: getPRsThisMonth().length,
   }
 })
 
@@ -90,9 +101,21 @@ const quickActions = [
 // Load data on mount
 onMounted(() => {
   loadLocalWorkouts()
+  loadWeeklyGoal()
   fetchGoals()
   loading.value = false
 })
+
+// Weekly goal editing
+function openWeeklyGoalModal() {
+  editingWeeklyGoal.value = weeklyGoalTarget.value
+  showWeeklyGoalModal.value = true
+}
+
+function saveWeeklyGoal() {
+  setWeeklyGoalTarget(editingWeeklyGoal.value)
+  showWeeklyGoalModal.value = false
+}
 
 function formatDuration(minutes: number) {
   const hrs = Math.floor(minutes / 60)
@@ -326,23 +349,28 @@ function formatDate(dateStr: string) {
     <!-- Weekly Progress & AI Insight -->
     <div class="grid lg:grid-cols-2 gap-6">
       <!-- Weekly Goal -->
-      <div class="card p-6">
-        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Weekly Goal</h2>
+      <div class="card p-6 cursor-pointer hover:shadow-md transition-shadow" @click="openWeeklyGoalModal">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Weekly Goal</h2>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+          </svg>
+        </div>
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <span class="text-gray-600 dark:text-gray-400">Workouts completed</span>
-            <span class="font-semibold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }} / 5</span>
+            <span class="font-semibold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }} / {{ weeklyGoalTarget }}</span>
           </div>
           <NProgress
             type="line"
-            :percentage="(stats.workoutsThisWeek / 5) * 100"
+            :percentage="Math.min((stats.workoutsThisWeek / weeklyGoalTarget) * 100, 100)"
             :height="8"
             :border-radius="4"
             :fill-border-radius="4"
             status="success"
           />
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ 5 - stats.workoutsThisWeek > 0 ? `${5 - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
+            {{ weeklyGoalTarget - stats.workoutsThisWeek > 0 ? `${weeklyGoalTarget - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
           </p>
         </div>
       </div>
@@ -377,5 +405,35 @@ function formatDate(dateStr: string) {
         </div>
       </div>
     </div>
+
+    <!-- Weekly Goal Edit Modal -->
+    <NModal
+      v-model:show="showWeeklyGoalModal"
+      preset="card"
+      title="Edit Weekly Goal"
+      :style="{ width: '90%', maxWidth: '350px' }"
+    >
+      <div class="space-y-4">
+        <p class="text-gray-600 dark:text-gray-400">
+          How many workouts do you want to complete each week?
+        </p>
+        <div class="flex items-center justify-center gap-4">
+          <NInputNumber
+            v-model:value="editingWeeklyGoal"
+            :min="1"
+            :max="7"
+            size="large"
+            :style="{ width: '120px' }"
+          />
+          <span class="text-gray-500 dark:text-gray-400">workouts / week</span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" @click="showWeeklyGoalModal = false">Cancel</NButton>
+          <NButton type="primary" class="flex-1" @click="saveWeeklyGoal">Save</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>

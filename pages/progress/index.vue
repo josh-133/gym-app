@@ -1,16 +1,39 @@
 <script setup lang="ts">
-import { NCard, NStatistic, NProgress } from 'naive-ui'
+import { NCard, NStatistic, NProgress, NModal, NInputNumber, NButton } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
 })
 
-const { workouts, loadWorkouts } = useWorkoutHistory()
+const {
+  workouts,
+  loadWorkouts,
+  getPRsThisMonth,
+  weeklyGoalTarget,
+  setWeeklyGoalTarget,
+  loadWeeklyGoal,
+} = useWorkoutHistory()
+
+// Weekly goal edit modal
+const showWeeklyGoalModal = ref(false)
+const editingWeeklyGoal = ref(5)
 
 // Load workouts on mount
 onMounted(() => {
   loadWorkouts()
+  loadWeeklyGoal()
 })
+
+// Weekly goal editing
+function openWeeklyGoalModal() {
+  editingWeeklyGoal.value = weeklyGoalTarget.value
+  showWeeklyGoalModal.value = true
+}
+
+function saveWeeklyGoal() {
+  setWeeklyGoalTarget(editingWeeklyGoal.value)
+  showWeeklyGoalModal.value = false
+}
 
 // Computed stats from workout history
 const stats = computed(() => {
@@ -84,7 +107,7 @@ const stats = computed(() => {
     averageWorkoutDuration,
     workoutsThisWeek,
     workoutsThisMonth,
-    prsThisMonth: 0, // PRs not tracked yet
+    prsThisMonth: getPRsThisMonth().length,
   }
 })
 
@@ -313,21 +336,29 @@ function formatDuration(minutes: number) {
     <!-- Overview Section -->
     <div class="grid lg:grid-cols-2 gap-6">
       <!-- Weekly Goal -->
-      <NCard title="Weekly Goal">
+      <NCard class="cursor-pointer hover:shadow-md transition-shadow" @click="openWeeklyGoalModal">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <span>Weekly Goal</span>
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </div>
+        </template>
         <div class="space-y-4">
           <div class="flex items-center justify-between">
             <span class="text-gray-600 dark:text-gray-400">Workouts this week</span>
-            <span class="font-semibold text-gray-900 dark:text-white">{{ stats.workoutsThisWeek }} / 5</span>
+            <span class="font-semibold text-gray-900 dark:text-white">{{ stats.workoutsThisWeek }} / {{ weeklyGoalTarget }}</span>
           </div>
           <NProgress
             type="line"
-            :percentage="(stats.workoutsThisWeek / 5) * 100"
+            :percentage="Math.min((stats.workoutsThisWeek / weeklyGoalTarget) * 100, 100)"
             :height="12"
             :border-radius="6"
             status="success"
           />
           <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ 5 - stats.workoutsThisWeek > 0 ? `${5 - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
+            {{ weeklyGoalTarget - stats.workoutsThisWeek > 0 ? `${weeklyGoalTarget - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
           </p>
         </div>
       </NCard>
@@ -411,5 +442,35 @@ function formatDuration(minutes: number) {
         </div>
       </NCard>
     </div>
+
+    <!-- Weekly Goal Edit Modal -->
+    <NModal
+      v-model:show="showWeeklyGoalModal"
+      preset="card"
+      title="Edit Weekly Goal"
+      :style="{ width: '90%', maxWidth: '350px' }"
+    >
+      <div class="space-y-4">
+        <p class="text-gray-600 dark:text-gray-400">
+          How many workouts do you want to complete each week?
+        </p>
+        <div class="flex items-center justify-center gap-4">
+          <NInputNumber
+            v-model:value="editingWeeklyGoal"
+            :min="1"
+            :max="7"
+            size="large"
+            :style="{ width: '120px' }"
+          />
+          <span class="text-gray-500 dark:text-gray-400">workouts / week</span>
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" @click="showWeeklyGoalModal = false">Cancel</NButton>
+          <NButton type="primary" class="flex-1" @click="saveWeeklyGoal">Save</NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>
