@@ -13,69 +13,71 @@ interface WorkoutTemplate {
 
 const STORAGE_KEY = 'gym-app-workout-templates'
 
-// Default templates
-const DEFAULT_TEMPLATES: WorkoutTemplate[] = [
-  {
-    id: 'push-day',
-    name: 'Push Day',
-    exercises: [
-      { name: 'Bench Press', sets: 4, defaultReps: 8 },
-      { name: 'Incline Dumbbell Press', sets: 3, defaultReps: 10 },
-      { name: 'Shoulder Press', sets: 3, defaultReps: 10 },
-      { name: 'Lateral Raise', sets: 3, defaultReps: 12 },
-      { name: 'Tricep Pushdown', sets: 3, defaultReps: 12 },
-      { name: 'Overhead Tricep Extension', sets: 3, defaultReps: 12 },
-    ],
-    createdAt: '2024-01-01',
-    lastUsed: null,
-  },
-  {
-    id: 'pull-day',
-    name: 'Pull Day',
-    exercises: [
-      { name: 'Deadlift', sets: 4, defaultReps: 6 },
-      { name: 'Barbell Row', sets: 4, defaultReps: 8 },
-      { name: 'Lat Pulldown', sets: 3, defaultReps: 10 },
-      { name: 'Seated Cable Row', sets: 3, defaultReps: 10 },
-      { name: 'Barbell Curl', sets: 3, defaultReps: 10 },
-    ],
-    createdAt: '2024-01-01',
-    lastUsed: null,
-  },
-  {
-    id: 'leg-day',
-    name: 'Leg Day',
-    exercises: [
-      { name: 'Squat', sets: 4, defaultReps: 8 },
-      { name: 'Romanian Deadlift', sets: 3, defaultReps: 10 },
-      { name: 'Leg Press', sets: 3, defaultReps: 12 },
-      { name: 'Leg Curl', sets: 3, defaultReps: 12 },
-      { name: 'Leg Extension', sets: 3, defaultReps: 12 },
-      { name: 'Standing Calf Raise', sets: 4, defaultReps: 15 },
-      { name: 'Seated Calf Raise', sets: 3, defaultReps: 15 },
-    ],
-    createdAt: '2024-01-01',
-    lastUsed: null,
-  },
-  {
-    id: 'full-body',
-    name: 'Full Body',
-    exercises: [
-      { name: 'Squat', sets: 3, defaultReps: 8 },
-      { name: 'Bench Press', sets: 3, defaultReps: 8 },
-      { name: 'Barbell Row', sets: 3, defaultReps: 8 },
-      { name: 'Shoulder Press', sets: 3, defaultReps: 10 },
-      { name: 'Romanian Deadlift', sets: 3, defaultReps: 10 },
-      { name: 'Lat Pulldown', sets: 3, defaultReps: 10 },
-      { name: 'Barbell Curl', sets: 2, defaultReps: 12 },
-      { name: 'Tricep Pushdown', sets: 2, defaultReps: 12 },
-      { name: 'Standing Calf Raise', sets: 3, defaultReps: 15 },
-      { name: 'Plank', sets: 3, defaultReps: 60 },
-    ],
-    createdAt: '2024-01-01',
-    lastUsed: null,
-  },
-]
+// Default templates - these are starter templates, no fake usage dates
+function getDefaultTemplates(): WorkoutTemplate[] {
+  return [
+    {
+      id: 'push-day',
+      name: 'Push Day',
+      exercises: [
+        { name: 'Bench Press', sets: 4, defaultReps: 8 },
+        { name: 'Incline Dumbbell Press', sets: 3, defaultReps: 10 },
+        { name: 'Shoulder Press', sets: 3, defaultReps: 10 },
+        { name: 'Lateral Raise', sets: 3, defaultReps: 12 },
+        { name: 'Tricep Pushdown', sets: 3, defaultReps: 12 },
+        { name: 'Overhead Tricep Extension', sets: 3, defaultReps: 12 },
+      ],
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+    },
+    {
+      id: 'pull-day',
+      name: 'Pull Day',
+      exercises: [
+        { name: 'Deadlift', sets: 4, defaultReps: 6 },
+        { name: 'Barbell Row', sets: 4, defaultReps: 8 },
+        { name: 'Lat Pulldown', sets: 3, defaultReps: 10 },
+        { name: 'Seated Cable Row', sets: 3, defaultReps: 10 },
+        { name: 'Barbell Curl', sets: 3, defaultReps: 10 },
+      ],
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+    },
+    {
+      id: 'leg-day',
+      name: 'Leg Day',
+      exercises: [
+        { name: 'Squat', sets: 4, defaultReps: 8 },
+        { name: 'Romanian Deadlift', sets: 3, defaultReps: 10 },
+        { name: 'Leg Press', sets: 3, defaultReps: 12 },
+        { name: 'Leg Curl', sets: 3, defaultReps: 12 },
+        { name: 'Leg Extension', sets: 3, defaultReps: 12 },
+        { name: 'Standing Calf Raise', sets: 4, defaultReps: 15 },
+        { name: 'Seated Calf Raise', sets: 3, defaultReps: 15 },
+      ],
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+    },
+    {
+      id: 'full-body',
+      name: 'Full Body',
+      exercises: [
+        { name: 'Squat', sets: 3, defaultReps: 8 },
+        { name: 'Bench Press', sets: 3, defaultReps: 8 },
+        { name: 'Barbell Row', sets: 3, defaultReps: 8 },
+        { name: 'Shoulder Press', sets: 3, defaultReps: 10 },
+        { name: 'Romanian Deadlift', sets: 3, defaultReps: 10 },
+        { name: 'Lat Pulldown', sets: 3, defaultReps: 10 },
+        { name: 'Barbell Curl', sets: 2, defaultReps: 12 },
+        { name: 'Tricep Pushdown', sets: 2, defaultReps: 12 },
+        { name: 'Standing Calf Raise', sets: 3, defaultReps: 15 },
+        { name: 'Plank', sets: 3, defaultReps: 60 },
+      ],
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+    },
+  ]
+}
 
 export function useTemplates() {
   const templates = useState<WorkoutTemplate[]>('workoutTemplates', () => [])
@@ -89,12 +91,12 @@ export function useTemplates() {
           templates.value = JSON.parse(stored)
         } catch (e) {
           console.error('Failed to parse templates:', e)
-          templates.value = [...DEFAULT_TEMPLATES]
+          templates.value = getDefaultTemplates()
           saveTemplates()
         }
       } else {
         // Initialize with default templates
-        templates.value = [...DEFAULT_TEMPLATES]
+        templates.value = getDefaultTemplates()
         saveTemplates()
       }
     }

@@ -10,6 +10,7 @@ definePageMeta({
 
 const workoutStore = useWorkoutStore()
 const { addWorkout: saveWorkout } = useWorkoutHistory()
+const { templates: savedTemplates, loadTemplates, markTemplateUsed } = useTemplates()
 const router = useRouter()
 const route = useRoute()
 
@@ -24,81 +25,58 @@ const useManualDuration = ref(false)
 const manualDurationHours = ref(0)
 const manualDurationMinutes = ref(30)
 
-// Mock templates for demo - in real app, fetch from Supabase
-interface WorkoutTemplate {
-  id: string
-  name: string
-  description: string
-  exercises: Exercise[]
-  estimatedDuration: number
-  muscleGroups: string[]
-  lastUsed?: string
+// Transform saved templates to the format expected by the UI
+const templates = computed(() => {
+  return savedTemplates.value.map(t => ({
+    id: t.id,
+    name: t.name,
+    description: getMuscleGroupDescription(t.exercises),
+    exercises: t.exercises.map(ex => convertToExercise(ex)),
+    estimatedDuration: t.exercises.length * 10, // Estimate ~10 min per exercise
+    muscleGroups: getUniqueMuscleGroups(t.exercises),
+    lastUsed: t.lastUsed || undefined,
+  }))
+})
+
+// Helper to get muscle groups from template exercises
+function getUniqueMuscleGroups(exercises: readonly { readonly name: string }[]): string[] {
+  const muscleGroups = new Set<string>()
+  exercises.forEach(ex => {
+    const libraryEx = EXERCISE_LIBRARY.find(e => e.name === ex.name)
+    if (libraryEx) {
+      libraryEx.muscleGroups.forEach(m => muscleGroups.add(m))
+    }
+  })
+  return Array.from(muscleGroups).slice(0, 4)
 }
 
-const templates = ref<WorkoutTemplate[]>([
-  {
-    id: '1',
-    name: 'Push Day',
-    description: 'Chest, shoulders, and triceps',
-    estimatedDuration: 60,
-    muscleGroups: ['chest', 'shoulders', 'triceps'],
-    lastUsed: '2024-01-09',
-    exercises: [
-      { id: '1', name: 'Bench Press', category: 'strength', muscle_groups: ['chest', 'triceps', 'shoulders'], equipment: ['barbell', 'bench'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '2', name: 'Incline Dumbbell Press', category: 'strength', muscle_groups: ['chest', 'shoulders'], equipment: ['dumbbell', 'bench'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '3', name: 'Cable Fly', category: 'strength', muscle_groups: ['chest'], equipment: ['cable'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '4', name: 'Overhead Press', category: 'strength', muscle_groups: ['shoulders', 'triceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '5', name: 'Lateral Raise', category: 'strength', muscle_groups: ['shoulders'], equipment: ['dumbbell'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '6', name: 'Tricep Pushdown', category: 'strength', muscle_groups: ['triceps'], equipment: ['cable'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'Pull Day',
-    description: 'Back and biceps',
-    estimatedDuration: 55,
-    muscleGroups: ['back', 'biceps'],
-    lastUsed: '2024-01-08',
-    exercises: [
-      { id: '8', name: 'Deadlift', category: 'strength', muscle_groups: ['back', 'glutes', 'hamstrings'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'advanced', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '10', name: 'Barbell Row', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '9', name: 'Pull-up', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['pull_up_bar'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '11', name: 'Lat Pulldown', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['cable'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '12', name: 'Barbell Curl', category: 'strength', muscle_groups: ['biceps'], equipment: ['barbell'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'Leg Day',
-    description: 'Quads, hamstrings, and glutes',
-    estimatedDuration: 70,
-    muscleGroups: ['quads', 'hamstrings', 'glutes', 'calves'],
-    lastUsed: '2024-01-06',
-    exercises: [
-      { id: '7', name: 'Squat', category: 'strength', muscle_groups: ['quads', 'glutes', 'hamstrings'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '13', name: 'Romanian Deadlift', category: 'strength', muscle_groups: ['hamstrings', 'glutes'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '14', name: 'Leg Press', category: 'strength', muscle_groups: ['quads', 'glutes'], equipment: ['machine'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '15', name: 'Leg Curl', category: 'strength', muscle_groups: ['hamstrings'], equipment: ['machine'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '16', name: 'Leg Extension', category: 'strength', muscle_groups: ['quads'], equipment: ['machine'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '17', name: 'Calf Raise', category: 'strength', muscle_groups: ['calves'], equipment: ['machine'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-    ],
-  },
-  {
-    id: '4',
-    name: 'Upper Body',
-    description: 'Full upper body workout',
-    estimatedDuration: 65,
-    muscleGroups: ['chest', 'back', 'shoulders', 'arms'],
-    exercises: [
-      { id: '1', name: 'Bench Press', category: 'strength', muscle_groups: ['chest', 'triceps', 'shoulders'], equipment: ['barbell', 'bench'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '10', name: 'Barbell Row', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '4', name: 'Overhead Press', category: 'strength', muscle_groups: ['shoulders', 'triceps'], equipment: ['barbell'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '9', name: 'Pull-up', category: 'strength', muscle_groups: ['back', 'biceps'], equipment: ['pull_up_bar'], is_compound: true, is_system: true, user_id: null, description: null, difficulty: 'intermediate', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '12', name: 'Barbell Curl', category: 'strength', muscle_groups: ['biceps'], equipment: ['barbell'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-      { id: '6', name: 'Tricep Pushdown', category: 'strength', muscle_groups: ['triceps'], equipment: ['cable'], is_compound: false, is_system: true, user_id: null, description: null, difficulty: 'beginner', instructions: [], video_url: null, image_url: null, created_at: '' },
-    ],
-  },
-])
+// Helper to create description from exercises
+function getMuscleGroupDescription(exercises: readonly { readonly name: string }[]): string {
+  const groups = getUniqueMuscleGroups(exercises)
+  if (groups.length === 0) return `${exercises.length} exercises`
+  return groups.slice(0, 3).map(g => g.replace('_', ' ')).join(', ')
+}
+
+// Helper to convert template exercise to full Exercise type
+function convertToExercise(ex: { readonly name: string; readonly sets: number; readonly defaultReps?: number }): Exercise {
+  const libraryEx = EXERCISE_LIBRARY.find(e => e.name === ex.name)
+  return {
+    id: libraryEx?.id || ex.name,
+    name: ex.name,
+    category: (libraryEx?.category || 'strength') as Exercise['category'],
+    muscle_groups: [...(libraryEx?.muscleGroups || [])] as Exercise['muscle_groups'],
+    equipment: [...(libraryEx?.equipment || [])] as Exercise['equipment'],
+    is_compound: libraryEx?.isCompound || false,
+    is_system: true,
+    user_id: null,
+    description: null,
+    difficulty: (libraryEx?.difficulty || 'intermediate') as Exercise['difficulty'],
+    instructions: [],
+    video_url: null,
+    image_url: null,
+    created_at: '',
+  }
+}
 
 // Convert EXERCISE_LIBRARY to Exercise format for the picker
 const exercises = computed<Exercise[]>(() => {
@@ -107,14 +85,14 @@ const exercises = computed<Exercise[]>(() => {
     .map(ex => ({
       id: ex.id,
       name: ex.name,
-      category: ex.category,
-      muscle_groups: ex.muscleGroups,
-      equipment: ex.equipment,
+      category: ex.category as Exercise['category'],
+      muscle_groups: [...ex.muscleGroups] as Exercise['muscle_groups'],
+      equipment: [...ex.equipment] as Exercise['equipment'],
       is_compound: ex.isCompound,
       is_system: true,
       user_id: null,
       description: null,
-      difficulty: ex.difficulty,
+      difficulty: ex.difficulty as Exercise['difficulty'],
       instructions: [],
       video_url: null,
       image_url: null,
@@ -137,8 +115,10 @@ function startWorkout() {
   workoutStore.startWorkout(name)
 }
 
-function startFromTemplate(template: WorkoutTemplate) {
+function startFromTemplate(template: typeof templates.value[0]) {
   workoutStore.startWorkout(template.name)
+  // Mark template as used
+  markTemplateUsed(template.id)
   // Add all exercises from the template
   template.exercises.forEach(exercise => {
     workoutStore.addExercise(exercise)
@@ -232,8 +212,9 @@ function disableFutureDates(ts: number) {
   return ts > Date.now()
 }
 
-// Check if there's an active workout
+// Load templates and check for active workout
 onMounted(() => {
+  loadTemplates()
   if (workoutStore.isActive) {
     // Resume existing workout
   }
