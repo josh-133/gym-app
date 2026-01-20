@@ -215,8 +215,29 @@ function disableFutureDates(ts: number) {
 // Load templates and check for active workout
 onMounted(() => {
   loadTemplates()
-  if (workoutStore.isActive) {
-    // Resume existing workout
+
+  // Check if a template ID was passed in the URL
+  const templateId = route.query.template as string
+  if (templateId && !workoutStore.isActive) {
+    // Wait for templates to load, then start the specified template
+    const checkAndStart = () => {
+      const template = templates.value.find(t => t.id === templateId)
+      if (template) {
+        startFromTemplate(template)
+      }
+    }
+
+    // Try immediately, or watch for templates to load
+    if (templates.value.length > 0) {
+      checkAndStart()
+    } else {
+      const stopWatch = watch(templates, (newTemplates) => {
+        if (newTemplates.length > 0) {
+          checkAndStart()
+          stopWatch()
+        }
+      })
+    }
   }
 })
 </script>
