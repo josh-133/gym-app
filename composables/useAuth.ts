@@ -25,15 +25,9 @@ export function useAuth() {
     }
 
     try {
-      const { data: { session: currentSession } } = await $supabase.auth.getSession()
-      if (currentSession) {
-        session.value = currentSession
-        user.value = currentSession.user
-        await fetchProfile()
-      }
-
-      // Listen for auth changes
-      $supabase.auth.onAuthStateChange(async (event, newSession) => {
+      // First, set up the auth state change listener
+      // This is important because it helps catch the session from storage
+      const { data: { subscription } } = $supabase.auth.onAuthStateChange(async (event, newSession) => {
         session.value = newSession
         user.value = newSession?.user ?? null
 
@@ -43,6 +37,14 @@ export function useAuth() {
           profile.value = null
         }
       })
+
+      // Then get the current session
+      const { data: { session: currentSession } } = await $supabase.auth.getSession()
+      if (currentSession) {
+        session.value = currentSession
+        user.value = currentSession.user
+        await fetchProfile()
+      }
     } finally {
       loading.value = false
     }

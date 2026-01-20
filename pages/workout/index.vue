@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { NCard, NButton, NTabs, NTabPane, NEmpty } from 'naive-ui'
+import { NCard, NButton, NTabs, NTabPane, NEmpty, NModal, NInput, NInputNumber } from 'naive-ui'
+import { EXERCISE_LIBRARY } from '~/utils/exercises'
 
 definePageMeta({
   middleware: ['auth'],
@@ -7,10 +8,20 @@ definePageMeta({
 
 // Get saved workouts from localStorage
 const { workouts: savedWorkouts, loadWorkouts } = useWorkoutHistory()
+const { templates: savedTemplates, loadTemplates, addTemplate, updateTemplate, deleteTemplate } = useTemplates()
 
-// Load workouts on mount
+// Modal state
+const showTemplateModal = ref(false)
+const editingTemplate = ref<string | null>(null)
+const templateName = ref('')
+const templateExercises = ref<{ name: string; sets: number; defaultReps?: number }[]>([])
+const showExercisePicker = ref(false)
+const exerciseSearch = ref('')
+
+// Load on mount
 onMounted(() => {
   loadWorkouts()
+  loadTemplates()
 })
 
 // Transform saved workouts for display
@@ -26,12 +37,110 @@ const workouts = computed(() => {
   }))
 })
 
-const templates = ref([
-  { id: '1', name: 'Push Day', exercises: 6, lastUsed: '2024-01-09' },
-  { id: '2', name: 'Pull Day', exercises: 5, lastUsed: '2024-01-08' },
-  { id: '3', name: 'Leg Day', exercises: 7, lastUsed: '2024-01-06' },
-  { id: '4', name: 'Full Body', exercises: 10, lastUsed: '2024-01-01' },
-])
+// Transform templates for display
+const templates = computed(() => {
+  return savedTemplates.value.map(t => ({
+    id: t.id,
+    name: t.name,
+    exercises: t.exercises.length,
+    lastUsed: t.lastUsed || t.createdAt,
+  }))
+})
+
+// Exercise picker
+const availableExercises = computed(() => {
+  return EXERCISE_LIBRARY
+    .filter(ex => ex.category !== 'warmup')
+    .map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      muscleGroups: ex.muscleGroups,
+    }))
+})
+
+const filteredExercises = computed(() => {
+  if (!exerciseSearch.value) return availableExercises.value.slice(0, 20)
+  const search = exerciseSearch.value.toLowerCase()
+  return availableExercises.value.filter(e =>
+    e.name.toLowerCase().includes(search) ||
+    e.muscleGroups.some(m => m.includes(search))
+  ).slice(0, 20)
+})
+
+function openCreateTemplate() {
+  editingTemplate.value = null
+  templateName.value = ''
+  templateExercises.value = []
+  showTemplateModal.value = true
+}
+
+function openEditTemplate(id: string) {
+  const template = savedTemplates.value.find(t => t.id === id)
+  if (template) {
+    editingTemplate.value = id
+    templateName.value = template.name
+    templateExercises.value = template.exercises.map(e => ({ ...e }))
+    showTemplateModal.value = true
+  }
+}
+
+function addExerciseToTemplate(exercise: { name: string }) {
+  templateExercises.value.push({
+    name: exercise.name,
+    sets: 3,
+    defaultReps: 10,
+  })
+  showExercisePicker.value = false
+  exerciseSearch.value = ''
+}
+
+function removeExerciseFromTemplate(index: number) {
+  templateExercises.value.splice(index, 1)
+}
+
+function moveExerciseUp(index: number) {
+  if (index > 0) {
+    const temp = templateExercises.value[index]
+    templateExercises.value[index] = templateExercises.value[index - 1]
+    templateExercises.value[index - 1] = temp
+  }
+}
+
+function moveExerciseDown(index: number) {
+  if (index < templateExercises.value.length - 1) {
+    const temp = templateExercises.value[index]
+    templateExercises.value[index] = templateExercises.value[index + 1]
+    templateExercises.value[index + 1] = temp
+  }
+}
+
+function saveTemplate() {
+  if (!templateName.value.trim() || templateExercises.value.length === 0) return
+
+  if (editingTemplate.value) {
+    updateTemplate(editingTemplate.value, {
+      name: templateName.value,
+      exercises: templateExercises.value,
+    })
+  } else {
+    addTemplate({
+      name: templateName.value,
+      exercises: templateExercises.value,
+    })
+  }
+
+  showTemplateModal.value = false
+}
+
+function confirmDeleteTemplate(id: string) {
+  if (confirm('Are you sure you want to delete this template?')) {
+    deleteTemplate(id)
+  }
+}
+
+function formatMuscleGroups(groups: string[]) {
+  return groups.map(g => g.replace('_', ' ')).join(', ')
+}
 
 function formatDuration(minutes: number) {
   const hrs = Math.floor(minutes / 60)
@@ -152,6 +261,16 @@ function getRatingStars(rating: number) {
       <!-- Templates Tab -->
       <NTabPane name="templates" tab="Templates">
         <div class="space-y-3 mt-4">
+          <!-- Create Template Button -->
+          <NButton type="primary" dashed block @click="openCreateTemplate">
+            <template #icon>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+            </template>
+            Create New Template
+          </NButton>
+
           <div
             v-for="template in templates"
             :key="template.id"
@@ -181,9 +300,12 @@ function getRatingStars(rating: number) {
                   <NuxtLink :to="`/workout/new?template=${template.id}`">
                     <NButton type="primary" size="small">Use</NButton>
                   </NuxtLink>
-                  <NuxtLink :to="`/templates/${template.id}`">
-                    <NButton size="small">Edit</NButton>
-                  </NuxtLink>
+                  <NButton size="small" @click="openEditTemplate(template.id)">Edit</NButton>
+                  <NButton size="small" type="error" quaternary @click="confirmDeleteTemplate(template.id)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </NButton>
                 </div>
               </div>
             </NCard>
@@ -191,13 +313,135 @@ function getRatingStars(rating: number) {
 
           <NEmpty v-if="templates.length === 0" description="No templates yet">
             <template #extra>
-              <NuxtLink to="/templates/new">
-                <NButton type="primary">Create Template</NButton>
-              </NuxtLink>
+              <NButton type="primary" @click="openCreateTemplate">Create Template</NButton>
             </template>
           </NEmpty>
         </div>
       </NTabPane>
     </NTabs>
+
+    <!-- Template Editor Modal -->
+    <NModal
+      v-model:show="showTemplateModal"
+      preset="card"
+      :title="editingTemplate ? 'Edit Template' : 'Create Template'"
+      style="width: 90%; max-width: 600px;"
+    >
+      <div class="space-y-4">
+        <!-- Template Name -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Template Name
+          </label>
+          <NInput v-model:value="templateName" placeholder="e.g., Push Day" />
+        </div>
+
+        <!-- Exercises List -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Exercises ({{ templateExercises.length }})
+            </label>
+            <NButton size="small" @click="showExercisePicker = true">
+              <template #icon>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </template>
+              Add Exercise
+            </NButton>
+          </div>
+
+          <div v-if="templateExercises.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+            No exercises added yet
+          </div>
+
+          <div v-else class="space-y-2">
+            <div
+              v-for="(exercise, index) in templateExercises"
+              :key="index"
+              class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-xl"
+            >
+              <div class="flex-1">
+                <p class="font-medium text-gray-900 dark:text-white">{{ exercise.name }}</p>
+                <div class="flex items-center gap-4 mt-1">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Sets:</span>
+                    <NInputNumber v-model:value="exercise.sets" :min="1" :max="10" size="tiny" style="width: 60px" />
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-500 dark:text-gray-400">Reps:</span>
+                    <NInputNumber v-model:value="exercise.defaultReps" :min="1" :max="100" size="tiny" style="width: 60px" />
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1">
+                <NButton size="tiny" quaternary :disabled="index === 0" @click="moveExerciseUp(index)">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </NButton>
+                <NButton size="tiny" quaternary :disabled="index === templateExercises.length - 1" @click="moveExerciseDown(index)">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </NButton>
+                <NButton size="tiny" quaternary type="error" @click="removeExerciseFromTemplate(index)">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </NButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" @click="showTemplateModal = false">Cancel</NButton>
+          <NButton type="primary" class="flex-1" :disabled="!templateName.trim() || templateExercises.length === 0" @click="saveTemplate">
+            {{ editingTemplate ? 'Save Changes' : 'Create Template' }}
+          </NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <!-- Exercise Picker Modal -->
+    <NModal
+      v-model:show="showExercisePicker"
+      preset="card"
+      title="Add Exercise"
+      style="width: 90%; max-width: 500px;"
+    >
+      <NInput
+        v-model:value="exerciseSearch"
+        placeholder="Search exercises..."
+        size="large"
+        class="mb-4"
+      >
+        <template #prefix>
+          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </template>
+      </NInput>
+
+      <div class="space-y-2 max-h-96 overflow-y-auto">
+        <button
+          v-for="exercise in filteredExercises"
+          :key="exercise.id"
+          class="w-full text-left p-3 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:shadow-md transition-all"
+          @click="addExerciseToTemplate(exercise)"
+        >
+          <div class="font-medium text-gray-900 dark:text-white">
+            {{ exercise.name }}
+          </div>
+          <div class="text-sm text-gray-500 dark:text-gray-400">
+            {{ formatMuscleGroups(exercise.muscleGroups) }}
+          </div>
+        </button>
+      </div>
+    </NModal>
   </div>
 </template>

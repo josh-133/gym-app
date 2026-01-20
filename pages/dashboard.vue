@@ -5,32 +5,80 @@ definePageMeta({
   middleware: ['auth'],
 })
 
-const { $supabase } = useNuxtApp()
 const auth = useAuth()
 const { activeGoals, fetchGoals, getProgressPercentage, getGoalTypeInfo } = useGoals()
+const { workouts: localWorkouts, loadWorkouts: loadLocalWorkouts } = useWorkoutHistory()
 
 // Loading state
 const loading = ref(true)
 
-// Stats with default values
-const stats = ref({
-  workoutsThisWeek: 0,
-  totalWorkouts: 0,
-  currentStreak: 0,
-  totalVolume: 0,
-  prsThisMonth: 0,
+// Stats computed from local workout history
+const stats = computed(() => {
+  const now = new Date()
+  const startOfWeek = new Date(now)
+  startOfWeek.setDate(now.getDate() - now.getDay())
+  startOfWeek.setHours(0, 0, 0, 0)
+
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  // Calculate from local workouts
+  const totalWorkouts = localWorkouts.value.length
+  const totalVolume = localWorkouts.value
+    .filter(w => new Date(w.date) >= startOfMonth)
+    .reduce((sum, w) => sum + (w.volume || 0), 0)
+
+  const workoutsThisWeek = localWorkouts.value.filter(w => {
+    const workoutDate = new Date(w.date)
+    return workoutDate >= startOfWeek
+  }).length
+
+  // Calculate current streak
+  let currentStreak = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const sortedWorkouts = [...localWorkouts.value].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  )
+
+  const workoutDates = new Set(
+    sortedWorkouts.map(w => {
+      const d = new Date(w.date)
+      d.setHours(0, 0, 0, 0)
+      return d.getTime()
+    })
+  )
+
+  let checkDate = new Date(today)
+  if (!workoutDates.has(checkDate.getTime())) {
+    checkDate.setDate(checkDate.getDate() - 1)
+  }
+
+  while (workoutDates.has(checkDate.getTime())) {
+    currentStreak++
+    checkDate.setDate(checkDate.getDate() - 1)
+  }
+
+  return {
+    workoutsThisWeek,
+    totalWorkouts,
+    currentStreak,
+    totalVolume: Math.round(totalVolume),
+    prsThisMonth: 0, // PRs not tracked in localStorage yet
+  }
 })
 
-// Recent workouts from database
-interface RecentWorkout {
-  id: string
-  name: string
-  date: string
-  duration: number
-  exercises: number
-  volume: number
-}
-const recentWorkouts = ref<RecentWorkout[]>([])
+// Recent workouts from local storage
+const recentWorkouts = computed(() => {
+  return localWorkouts.value.slice(0, 5).map(w => ({
+    id: w.id,
+    name: w.name,
+    date: w.date,
+    duration: Math.round((w.duration || 0) / 60),
+    exercises: w.exercises.length,
+    volume: w.volume,
+  }))
+})
 
 const quickActions = [
   { label: 'Push', icon: 'chest' },
@@ -39,188 +87,11 @@ const quickActions = [
   { label: 'Custom', icon: 'plus' },
 ]
 
-// Fetch dashboard data
-async function fetchDashboardData() {
-  if (!$supabase || !auth.user.value) {
-    loading.value = false
-    return
-  }
-
-  try {
-    const userId = auth.user.value.id
-    const now = new Date()
-    const startOfWeek = new Date(now)
-    startOfWeek.setDate(now.getDate() - now.getDay())
-    startOfWeek.setHours(0, 0, 0, 0)
-
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
-    // Fetch recent workouts with exercise count
-    const { data: workouts, error: workoutsError } = await $supabase
-      .from('workout_sessions')
-      .select(`
-        id,
-        name,
-        started_at,
-        duration_sec,
-        exercise_logs (
-          id,
-          sets (
-            weight_kg,
-            reps
-          )
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('status', 'completed')
-      .order('started_at', { ascending: false })
-      .limit(5)
-
-    if (workoutsError) {
-      console.error('Error fetching workouts:', workoutsError)
-    } else if (workouts) {
-      recentWorkouts.value = workouts.map(w => {
-        // Calculate volume (sum of weight * reps for all sets)
-        let volume = 0
-        const exerciseCount = w.exercise_logs?.length || 0
-
-        w.exercise_logs?.forEach(log => {
-          log.sets?.forEach(set => {
-            if (set.weight_kg && set.reps) {
-              volume += set.weight_kg * set.reps
-            }
-          })
-        })
-
-        return {
-          id: w.id,
-          name: w.name,
-          date: w.started_at,
-          duration: Math.round((w.duration_sec || 0) / 60), // Convert to minutes
-          exercises: exerciseCount,
-          volume: Math.round(volume),
-        }
-      })
-    }
-
-    // Fetch total workouts count
-    const { count: totalCount } = await $supabase
-      .from('workout_sessions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('status', 'completed')
-
-    stats.value.totalWorkouts = totalCount || 0
-
-    // Fetch workouts this week
-    const { count: weekCount } = await $supabase
-      .from('workout_sessions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('status', 'completed')
-      .gte('started_at', startOfWeek.toISOString())
-
-    stats.value.workoutsThisWeek = weekCount || 0
-
-    // Fetch PRs this month
-    const { count: prCount } = await $supabase
-      .from('personal_records')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .gte('achieved_at', startOfMonth.toISOString())
-
-    stats.value.prsThisMonth = prCount || 0
-
-    // Calculate total volume this month
-    const { data: monthWorkouts } = await $supabase
-      .from('workout_sessions')
-      .select(`
-        exercise_logs (
-          sets (
-            weight_kg,
-            reps
-          )
-        )
-      `)
-      .eq('user_id', userId)
-      .eq('status', 'completed')
-      .gte('started_at', startOfMonth.toISOString())
-
-    let totalVolume = 0
-    monthWorkouts?.forEach(w => {
-      w.exercise_logs?.forEach(log => {
-        log.sets?.forEach(set => {
-          if (set.weight_kg && set.reps) {
-            totalVolume += set.weight_kg * set.reps
-          }
-        })
-      })
-    })
-    stats.value.totalVolume = Math.round(totalVolume)
-
-    // Calculate current streak
-    const { data: allWorkouts } = await $supabase
-      .from('workout_sessions')
-      .select('started_at')
-      .eq('user_id', userId)
-      .eq('status', 'completed')
-      .order('started_at', { ascending: false })
-
-    if (allWorkouts && allWorkouts.length > 0) {
-      let streak = 0
-      let currentDate = new Date()
-      currentDate.setHours(0, 0, 0, 0)
-
-      // Create a set of workout dates
-      const workoutDates = new Set(
-        allWorkouts.map(w => {
-          const d = new Date(w.started_at)
-          return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-        })
-      )
-
-      // Check if worked out today or yesterday to start streak
-      const todayStr = `${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}`
-      const yesterday = new Date(currentDate)
-      yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayStr = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`
-
-      if (workoutDates.has(todayStr) || workoutDates.has(yesterdayStr)) {
-        // Start from today or yesterday and count backwards
-        let checkDate = workoutDates.has(todayStr) ? currentDate : yesterday
-
-        while (true) {
-          const checkStr = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`
-          if (workoutDates.has(checkStr)) {
-            streak++
-            checkDate.setDate(checkDate.getDate() - 1)
-          } else {
-            break
-          }
-        }
-      }
-
-      stats.value.currentStreak = streak
-    }
-
-  } catch (error) {
-    console.error('Error fetching dashboard data:', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-// Fetch data on mount
+// Load data on mount
 onMounted(() => {
-  fetchDashboardData()
+  loadLocalWorkouts()
   fetchGoals()
-})
-
-// Refetch when user changes
-watch(() => auth.user.value?.id, () => {
-  if (auth.user.value) {
-    fetchDashboardData()
-  }
+  loading.value = false
 })
 
 function formatDuration(minutes: number) {
