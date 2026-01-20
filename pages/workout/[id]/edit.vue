@@ -8,8 +8,10 @@ definePageMeta({
 
 const route = useRoute()
 const router = useRouter()
-const workoutId = route.params.id as string
 const { workouts, getWorkout, updateWorkout, loadWorkouts } = useWorkoutHistory()
+
+// Get workout ID from route - computed to ensure reactivity
+const workoutId = computed(() => route.params.id as string)
 
 // Form state
 const workoutName = ref('')
@@ -35,13 +37,13 @@ const dataLoaded = ref(false)
 
 // Load workout data
 function loadWorkoutData() {
-  if (!workoutId || workoutId === 'undefined') {
+  if (!workoutId.value || workoutId.value === 'undefined') {
     notFound.value = true
     loading.value = false
     return
   }
 
-  const savedWorkout = getWorkout(workoutId)
+  const savedWorkout = getWorkout(workoutId.value)
 
   if (savedWorkout) {
     workoutName.value = savedWorkout.name
@@ -169,7 +171,7 @@ async function saveChanges() {
   const duration = (durationHours.value * 3600) + (durationMinutes.value * 60)
   const selectedDate = new Date(workoutDate.value).toISOString()
 
-  const success = updateWorkout(workoutId, {
+  const success = updateWorkout(workoutId.value, {
     name: workoutName.value,
     date: selectedDate,
     duration,
@@ -181,7 +183,7 @@ async function saveChanges() {
   saving.value = false
 
   if (success) {
-    router.push(`/workout/${workoutId}`)
+    router.push(`/workout/${workoutId.value}`)
   }
 }
 
