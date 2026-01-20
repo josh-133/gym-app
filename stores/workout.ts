@@ -185,6 +185,16 @@ export const useWorkoutStore = defineStore('workout', {
       })
     },
 
+    uncompleteSet(exerciseIndex: number, setIndex: number) {
+      const log = this.exerciseLogs[exerciseIndex]
+      if (!log || !log.sets[setIndex]) return
+
+      log.sets[setIndex] = {
+        ...log.sets[setIndex],
+        completed_at: null,
+      }
+    },
+
     updateCardioLog(exerciseIndex: number, data: Partial<CardioLog>) {
       const log = this.exerciseLogs[exerciseIndex]
       if (!log || !log.cardio_log) return

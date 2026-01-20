@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NInput, NButton, NCheckbox } from 'naive-ui'
+import { NInputNumber, NButton } from 'naive-ui'
 
 interface SetData {
   set_number: number
@@ -19,27 +19,31 @@ const props = defineProps<{
 
 const workoutStore = useWorkoutStore()
 
-const weight = ref(props.set.weight_kg?.toString() || '')
-const reps = ref(props.set.reps?.toString() || '')
+const weight = ref<number | null>(props.set.weight_kg)
+const reps = ref<number | null>(props.set.reps)
 const isCompleted = ref(!!props.set.completed_at)
 
-watch([weight, reps], () => {
+watch([weight, reps], ([newWeight, newReps]) => {
   workoutStore.updateSet(props.exerciseIndex, props.setIndex, {
-    weight_kg: weight.value ? parseFloat(weight.value) : null,
-    reps: reps.value ? parseInt(reps.value) : null,
+    weight_kg: newWeight,
+    reps: newReps,
   })
-})
 
-function toggleComplete() {
-  if (!isCompleted.value) {
-    // Complete the set
+  // Auto-complete when both values are valid
+  if (newWeight && newReps && newWeight > 0 && newReps > 0 && !isCompleted.value) {
     workoutStore.completeSet(props.exerciseIndex, props.setIndex, {
-      weight_kg: weight.value ? parseFloat(weight.value) : null,
-      reps: reps.value ? parseInt(reps.value) : null,
+      weight_kg: newWeight,
+      reps: newReps,
     })
     isCompleted.value = true
   }
-}
+
+  // Uncomplete if values become invalid
+  if (isCompleted.value && (!newWeight || !newReps || newWeight <= 0 || newReps <= 0)) {
+    workoutStore.uncompleteSet(props.exerciseIndex, props.setIndex)
+    isCompleted.value = false
+  }
+})
 
 function removeSet() {
   workoutStore.removeSet(props.exerciseIndex, props.setIndex)
@@ -63,38 +67,32 @@ function removeSet() {
 
     <!-- Weight -->
     <div class="col-span-3">
-      <NInput
+      <NInputNumber
         v-model:value="weight"
         placeholder="kg"
         size="small"
-        :disabled="isCompleted"
+        :min="0"
+        :max="500"
+        :precision="1"
+        :show-button="false"
       />
     </div>
 
     <!-- Reps -->
     <div class="col-span-3">
-      <NInput
+      <NInputNumber
         v-model:value="reps"
         placeholder="reps"
         size="small"
-        :disabled="isCompleted"
+        :min="0"
+        :max="100"
+        :show-button="false"
       />
     </div>
 
     <!-- Actions -->
     <div class="col-span-2 flex justify-center gap-1">
-      <button
-        v-if="!isCompleted"
-        class="p-1.5 rounded-lg text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-50"
-        :disabled="!weight || !reps"
-        @click="toggleComplete"
-        title="Complete set"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-        </svg>
-      </button>
-      <span v-else class="text-green-600 dark:text-green-400">
+      <span v-if="isCompleted" class="text-green-600 dark:text-green-400">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
         </svg>
