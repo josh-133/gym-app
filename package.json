@@ -14,7 +14,6 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.0",
     "@pinia/nuxt": "^0.5.5",
     "@supabase/supabase-js": "^2.45.0",
     "@vee-validate/nuxt": "^4.14.0",

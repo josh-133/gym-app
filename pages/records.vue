@@ -5,7 +5,10 @@ definePageMeta({
   middleware: ['auth'],
 })
 
-const { calculateAllPRs, loadWorkouts, getPRsThisMonth } = useWorkoutHistory()
+const { calculateAllPRs, loadWorkouts, getPRsThisMonth, calculateDayStreak } = useWorkoutHistory()
+
+// Day streak calculated from workout history
+const dayStreak = computed(() => calculateDayStreak())
 
 // Load workouts on mount
 onMounted(() => {
@@ -96,7 +99,7 @@ function formatDate(dateStr: string) {
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Total (Big 3) kg</p>
       </NCard>
       <NCard class="text-center">
-        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">—</p>
+        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">{{ dayStreak || '—' }}</p>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Day Streak</p>
       </NCard>
     </div>

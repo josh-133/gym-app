@@ -35,7 +35,6 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
     supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,

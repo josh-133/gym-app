@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NConfigProvider, darkTheme, type GlobalThemeOverrides } from 'naive-ui'
+import { NConfigProvider, NMessageProvider, darkTheme, type GlobalThemeOverrides } from 'naive-ui'
 
 const uiStore = useUIStore()
 
@@ -47,10 +47,12 @@ const naiveTheme = computed(() => uiStore.isDarkMode ? darkTheme : null)
 
 <template>
   <NConfigProvider :theme="naiveTheme" :theme-overrides="themeOverrides">
-    <div class="min-h-screen mesh-bg-light dark:mesh-bg">
-      <LayoutAppShell>
-        <slot />
-      </LayoutAppShell>
-    </div>
+    <NMessageProvider>
+      <div class="min-h-screen mesh-bg-light dark:mesh-bg">
+        <LayoutAppShell>
+          <slot />
+        </LayoutAppShell>
+      </div>
+    </NMessageProvider>
   </NConfigProvider>
 </template>

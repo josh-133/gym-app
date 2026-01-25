@@ -7,6 +7,7 @@ definePageMeta({
 })
 
 const { customExercisesAsDefinitions, fetchCustomExercises, addCustomExercise, deleteCustomExercise, loading: customLoading } = useCustomExercises()
+const notification = useNotification()
 
 // Fetch custom exercises on mount
 onMounted(() => {
@@ -50,8 +51,10 @@ async function handleAddExercise() {
     await addCustomExercise(newExercise.value)
     showAddModal.value = false
     resetForm()
+    notification.success('Exercise created!')
   } catch (err) {
     console.error('Error adding exercise:', err)
+    notification.error('Failed to create exercise. Please try again.')
   } finally {
     saving.value = false
   }

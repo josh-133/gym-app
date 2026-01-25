@@ -7,6 +7,7 @@ definePageMeta({
 
 const route = useRoute()
 const { isPremium, status, startCheckout, openCustomerPortal, isLoading } = useSubscription()
+const notification = useNotification()
 
 const isProcessing = ref(false)
 
@@ -15,25 +16,25 @@ const cancelled = computed(() => route.query.cancelled === 'true')
 
 const features = [
   {
-    icon: 'brain',
-    title: 'AI Workout Generator',
-    description: 'Get personalized workout plans tailored to your goals, equipment, and experience level',
+    icon: 'chart',
+    title: 'Advanced Analytics',
+    description: 'Deep dive into your performance metrics with detailed charts and trend analysis',
   },
   {
     icon: 'trending',
-    title: 'AI Training Insights',
-    description: 'Receive intelligent analysis of your workout patterns, progress, and recommendations',
+    title: 'Progress Tracking',
+    description: 'Track your strength gains, body measurements, and workout consistency over time',
   },
   {
     icon: 'bolt',
-    title: 'Advanced Analytics',
-    description: 'Deep dive into your performance metrics with detailed charts and trend analysis',
+    title: 'Priority Support',
+    description: 'Get faster responses and dedicated support for any questions or issues',
   },
 ]
 
 const benefits = [
-  'Unlimited AI workout generations',
-  'Personalized training insights',
+  'Advanced analytics dashboard',
+  'Detailed progress tracking',
   'Priority support',
   'Cancel anytime',
 ]
@@ -44,6 +45,7 @@ async function handleUpgrade() {
     await startCheckout()
   } catch (error) {
     console.error('Failed to start checkout:', error)
+    notification.error('Failed to start checkout. Please try again.')
   } finally {
     isProcessing.value = false
   }
@@ -55,6 +57,7 @@ async function handleManageSubscription() {
     await openCustomerPortal()
   } catch (error) {
     console.error('Failed to open portal:', error)
+    notification.error('Failed to open subscription portal. Please try again.')
   } finally {
     isProcessing.value = false
   }
@@ -68,11 +71,11 @@ async function handleManageSubscription() {
       <NResult
         status="success"
         title="Welcome to Premium!"
-        description="Your subscription is now active. Enjoy unlimited access to AI features."
+        description="Your subscription is now active. Enjoy all premium features."
       >
         <template #footer>
-          <NButton type="primary" @click="navigateTo('/generate')">
-            Try AI Workout Generator
+          <NButton type="primary" @click="navigateTo('/dashboard')">
+            Go to Dashboard
           </NButton>
         </template>
       </NResult>
@@ -111,14 +114,11 @@ async function handleManageSubscription() {
             You're a Premium Member!
           </h1>
           <p class="text-gray-500 dark:text-gray-400 mb-6">
-            You have full access to all AI features. Thank you for your support!
+            You have full access to all premium features. Thank you for your support!
           </p>
           <div class="flex justify-center gap-4">
-            <NButton @click="navigateTo('/generate')">
-              AI Workout Generator
-            </NButton>
-            <NButton @click="navigateTo('/insights')">
-              AI Insights
+            <NButton type="primary" @click="navigateTo('/dashboard')">
+              Go to Dashboard
             </NButton>
           </div>
         </div>
@@ -154,7 +154,7 @@ async function handleManageSubscription() {
           Upgrade to Premium
         </h1>
         <p class="text-lg text-gray-500 dark:text-gray-400">
-          Unlock the full potential of your training with AI-powered features
+          Unlock the full potential of your training with premium features
         </p>
       </div>
 
@@ -163,8 +163,8 @@ async function handleManageSubscription() {
         <NCard v-for="feature in features" :key="feature.title">
           <div class="text-center">
             <div class="w-12 h-12 mx-auto rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mb-4">
-              <svg v-if="feature.icon === 'brain'" class="w-6 h-6 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              <svg v-if="feature.icon === 'chart'" class="w-6 h-6 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <svg v-else-if="feature.icon === 'trending'" class="w-6 h-6 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />

@@ -6,6 +6,7 @@ definePageMeta({
 })
 
 const { measurements, loading, fetchMeasurements, addMeasurement, latestMeasurement, weightHistory, measurementsHistory } = useBodyMeasurements()
+const notification = useNotification()
 
 // Fetch measurements on mount
 onMounted(() => {
@@ -93,6 +94,21 @@ const bodyFatChange = computed(() => {
   return +(last - first).toFixed(1)
 })
 
+// Calculate measurement changes from history
+const measurementChanges = computed(() => {
+  if (measurementsHistory.value.length < 2) {
+    return { chest: null, waist: null, hips: null, arms: null }
+  }
+  const first = measurementsHistory.value[0]
+  const last = measurementsHistory.value[measurementsHistory.value.length - 1]
+  return {
+    chest: first.chest && last.chest ? +(last.chest - first.chest).toFixed(1) : null,
+    waist: first.waist && last.waist ? +(last.waist - first.waist).toFixed(1) : null,
+    hips: first.hips && last.hips ? +(last.hips - first.hips).toFixed(1) : null,
+    arms: first.arms && last.arms ? +(last.arms - first.arms).toFixed(1) : null,
+  }
+})
+
 const progressToGoalWeight = computed(() => {
   const start = weightHistory.value[0]?.weight || currentStats.value.weight
   const current = currentStats.value.weight
@@ -135,8 +151,10 @@ async function saveMeasurement() {
     })
     showAddModal.value = false
     resetForm()
+    notification.success('Measurement saved!')
   } catch (err) {
     console.error('Error saving measurement:', err)
+    notification.error('Failed to save measurement. Please try again.')
   } finally {
     saving.value = false
   }
@@ -219,8 +237,8 @@ async function saveMeasurement() {
       <NCard class="!bg-gradient-to-br from-energy-500 to-warning-500 shadow-xl">
         <div class="text-white text-center">
           <p class="text-white/80 text-sm">Muscle Mass</p>
-          <p class="text-3xl font-bold mt-1">{{ (currentStats.weight * (1 - currentStats.bodyFat / 100)).toFixed(1) }}kg</p>
-          <p class="text-sm mt-2 text-green-200">+1.8kg</p>
+          <p class="text-3xl font-bold mt-1">{{ currentStats.bodyFat > 0 ? (currentStats.weight * (1 - currentStats.bodyFat / 100)).toFixed(1) : '—' }}kg</p>
+          <p class="text-sm mt-2 text-white/60">estimated</p>
         </div>
       </NCard>
       <NCard class="!bg-gradient-to-br from-accent-500 to-primary-500 shadow-xl">
@@ -379,23 +397,31 @@ async function saveMeasurement() {
           <div class="grid grid-cols-2 gap-3">
             <div class="p-3 bg-primary-50 dark:bg-primary-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Chest</p>
-              <p class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ currentStats.chest }}cm</p>
-              <p class="text-xs text-success-600">+2cm</p>
+              <p class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ currentStats.chest || '—' }}cm</p>
+              <p v-if="measurementChanges.chest !== null" class="text-xs" :class="measurementChanges.chest >= 0 ? 'text-success-600' : 'text-red-500'">
+                {{ measurementChanges.chest > 0 ? '+' : '' }}{{ measurementChanges.chest }}cm
+              </p>
             </div>
             <div class="p-3 bg-accent-50 dark:bg-accent-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Waist</p>
-              <p class="text-xl font-bold text-accent-600 dark:text-accent-400">{{ currentStats.waist }}cm</p>
-              <p class="text-xs text-success-600">-4cm</p>
+              <p class="text-xl font-bold text-accent-600 dark:text-accent-400">{{ currentStats.waist || '—' }}cm</p>
+              <p v-if="measurementChanges.waist !== null" class="text-xs" :class="measurementChanges.waist <= 0 ? 'text-success-600' : 'text-red-500'">
+                {{ measurementChanges.waist > 0 ? '+' : '' }}{{ measurementChanges.waist }}cm
+              </p>
             </div>
             <div class="p-3 bg-secondary-50 dark:bg-secondary-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Hips</p>
-              <p class="text-xl font-bold text-secondary-600 dark:text-secondary-400">{{ currentStats.hips }}cm</p>
-              <p class="text-xs text-success-600">-2cm</p>
+              <p class="text-xl font-bold text-secondary-600 dark:text-secondary-400">{{ currentStats.hips || '—' }}cm</p>
+              <p v-if="measurementChanges.hips !== null" class="text-xs" :class="measurementChanges.hips <= 0 ? 'text-success-600' : 'text-red-500'">
+                {{ measurementChanges.hips > 0 ? '+' : '' }}{{ measurementChanges.hips }}cm
+              </p>
             </div>
             <div class="p-3 bg-success-50 dark:bg-success-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Arms (avg)</p>
-              <p class="text-xl font-bold text-success-600 dark:text-success-400">{{ ((currentStats.leftArm + currentStats.rightArm) / 2).toFixed(1) }}cm</p>
-              <p class="text-xs text-success-600">+1.5cm</p>
+              <p class="text-xl font-bold text-success-600 dark:text-success-400">{{ currentStats.leftArm || currentStats.rightArm ? ((currentStats.leftArm + currentStats.rightArm) / 2).toFixed(1) : '—' }}cm</p>
+              <p v-if="measurementChanges.arms !== null" class="text-xs" :class="measurementChanges.arms >= 0 ? 'text-success-600' : 'text-red-500'">
+                {{ measurementChanges.arms > 0 ? '+' : '' }}{{ measurementChanges.arms }}cm
+              </p>
             </div>
           </div>
         </div>

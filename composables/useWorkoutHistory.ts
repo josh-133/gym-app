@@ -169,6 +169,60 @@ export function useWorkoutHistory() {
     return allPRs.find(pr => pr.exercise === exerciseName) || null
   }
 
+  // Calculate current day streak (consecutive days with workouts)
+  function calculateDayStreak(): number {
+    if (workouts.value.length === 0) return 0
+
+    // Get unique workout dates, sorted from most recent to oldest
+    const workoutDates = [...new Set(
+      workouts.value.map(w => {
+        const date = new Date(w.date)
+        return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+      })
+    )].map(dateStr => {
+      const [year, month, day] = dateStr.split('-').map(Number)
+      return new Date(year, month, day)
+    }).sort((a, b) => b.getTime() - a.getTime())
+
+    if (workoutDates.length === 0) return 0
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const mostRecentWorkout = workoutDates[0]
+    mostRecentWorkout.setHours(0, 0, 0, 0)
+
+    // Streak only counts if most recent workout is today or yesterday
+    if (mostRecentWorkout.getTime() !== today.getTime() &&
+        mostRecentWorkout.getTime() !== yesterday.getTime()) {
+      return 0
+    }
+
+    let streak = 1
+    let currentDate = mostRecentWorkout
+
+    for (let i = 1; i < workoutDates.length; i++) {
+      const prevDate = new Date(currentDate)
+      prevDate.setDate(prevDate.getDate() - 1)
+      prevDate.setHours(0, 0, 0, 0)
+
+      const workoutDate = workoutDates[i]
+      workoutDate.setHours(0, 0, 0, 0)
+
+      if (workoutDate.getTime() === prevDate.getTime()) {
+        streak++
+        currentDate = workoutDate
+      } else {
+        break
+      }
+    }
+
+    return streak
+  }
+
   // Initialize on mount
   onMounted(() => {
     loadWorkouts()
@@ -187,6 +241,8 @@ export function useWorkoutHistory() {
     calculateAllPRs,
     getPRsThisMonth,
     getExercisePR,
+    // Streak
+    calculateDayStreak,
     // Weekly goal
     weeklyGoalTarget: readonly(weeklyGoalTarget),
     setWeeklyGoalTarget,

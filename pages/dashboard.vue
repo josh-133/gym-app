@@ -346,63 +346,30 @@ function formatDate(dateStr: string) {
       </div>
     </div>
 
-    <!-- Weekly Progress & AI Insight -->
-    <div class="grid lg:grid-cols-2 gap-6">
-      <!-- Weekly Goal -->
-      <div class="card p-6 cursor-pointer hover:shadow-md transition-shadow" @click="openWeeklyGoalModal">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Weekly Goal</h2>
-          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-        </div>
-        <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <span class="text-gray-600 dark:text-gray-400">Workouts completed</span>
-            <span class="font-semibold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }} / {{ weeklyGoalTarget }}</span>
-          </div>
-          <NProgress
-            type="line"
-            :percentage="Math.min((stats.workoutsThisWeek / weeklyGoalTarget) * 100, 100)"
-            :height="8"
-            :border-radius="4"
-            :fill-border-radius="4"
-            status="success"
-          />
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ weeklyGoalTarget - stats.workoutsThisWeek > 0 ? `${weeklyGoalTarget - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
-          </p>
-        </div>
+    <!-- Weekly Goal -->
+    <div class="card p-6 cursor-pointer hover:shadow-md transition-shadow" @click="openWeeklyGoalModal">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Weekly Goal</h2>
+        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
       </div>
-
-      <!-- AI Insight Preview -->
-      <div class="card p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">AI Insight</h2>
-          <NuxtLink to="/insights" class="text-sm text-primary-900 dark:text-white font-medium hover:underline">
-            View all
-          </NuxtLink>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-gray-600 dark:text-gray-400">Workouts completed</span>
+          <span class="font-semibold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }} / {{ weeklyGoalTarget }}</span>
         </div>
-
-        <div class="flex gap-4">
-          <div class="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center flex-shrink-0">
-            <svg class="w-5 h-5 text-accent-600 dark:text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <div v-if="stats.totalWorkouts > 0">
-            <h4 class="font-medium text-primary-900 dark:text-white mb-1">Keep up the momentum!</h4>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              You've completed {{ stats.totalWorkouts }} workout{{ stats.totalWorkouts !== 1 ? 's' : '' }}. Log more workouts to unlock personalized AI insights and recommendations.
-            </p>
-          </div>
-          <div v-else>
-            <h4 class="font-medium text-primary-900 dark:text-white mb-1">Start tracking your workouts</h4>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              Complete your first workout to unlock AI-powered insights and personalized recommendations.
-            </p>
-          </div>
-        </div>
+        <NProgress
+          type="line"
+          :percentage="Math.min((stats.workoutsThisWeek / weeklyGoalTarget) * 100, 100)"
+          :height="8"
+          :border-radius="4"
+          :fill-border-radius="4"
+          status="success"
+        />
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          {{ weeklyGoalTarget - stats.workoutsThisWeek > 0 ? `${weeklyGoalTarget - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
+        </p>
       </div>
     </div>
 

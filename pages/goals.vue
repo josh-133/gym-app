@@ -7,6 +7,7 @@ definePageMeta({
 })
 
 const { goals, loading, fetchGoals, createGoal, updateGoalProgress, deleteGoal, activeGoals, completedGoals, getProgressPercentage, getGoalTypeInfo } = useGoals()
+const notification = useNotification()
 
 // Fetch goals on mount
 onMounted(() => {
@@ -71,8 +72,10 @@ async function handleAddGoal() {
     await createGoal(newGoal.value)
     showAddModal.value = false
     resetForm()
+    notification.success('Goal created successfully!')
   } catch (err) {
     console.error('Error adding goal:', err)
+    notification.error('Failed to create goal. Please try again.')
   } finally {
     saving.value = false
   }
@@ -101,8 +104,10 @@ async function handleUpdateProgress() {
     await updateGoalProgress(editingGoalId.value, newGoal.value.current_value || 0)
     showEditModal.value = false
     resetForm()
+    notification.success('Progress updated!')
   } catch (err) {
     console.error('Error updating goal:', err)
+    notification.error('Failed to update progress. Please try again.')
   } finally {
     saving.value = false
   }
@@ -113,8 +118,10 @@ async function handleDeleteGoal(id: string) {
 
   try {
     await deleteGoal(id)
+    notification.success('Goal deleted.')
   } catch (err) {
     console.error('Error deleting goal:', err)
+    notification.error('Failed to delete goal. Please try again.')
   }
 }
 

@@ -14,7 +14,6 @@ const pageTitle = computed(() => {
     '/progress': 'Progress',
     '/records': 'Records',
     '/achievements': 'Achievements',
-    '/insights': 'Insights',
     '/profile': 'Profile',
   }
   return titles[route.path] || 'GymTracker'

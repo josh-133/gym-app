@@ -19,14 +19,12 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: 'home', to: '/dashboard' },
   { label: 'Workout', icon: 'dumbbell', to: '/workout' },
-  { label: 'Generate', icon: 'bolt', to: '/generate', premium: true },
   { label: 'Calendar', icon: 'calendar', to: '/calendar' },
   { label: 'Exercises', icon: 'list', to: '/exercises' },
   { label: 'Progress', icon: 'chart', to: '/progress' },
   { label: 'Records', icon: 'trophy', to: '/records' },
   { label: 'Achievements', icon: 'medal', to: '/achievements' },
   { label: 'Tools', icon: 'tools', to: '/tools' },
-  { label: 'Insights', icon: 'sparkles', to: '/insights', premium: true },
 ]
 
 const bottomNavItems: NavItem[] = [

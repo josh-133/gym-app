@@ -11,6 +11,7 @@ const uiStore = useUIStore()
 const route = useRoute()
 const router = useRouter()
 const { isPremium, status, openCustomerPortal } = useSubscription()
+const notification = useNotification()
 
 // Tab state - read from query parameter
 const activeTab = ref<string>('profile')
@@ -57,6 +58,7 @@ async function handleDeleteAccount() {
     await navigateTo('/login')
   } catch (error) {
     console.error('Delete account error:', error)
+    notification.error('Failed to delete account. Please try again.')
   } finally {
     isDeleting.value = false
     showDeleteModal.value = false
@@ -69,6 +71,7 @@ async function handleManageSubscription() {
     await openCustomerPortal()
   } catch (error) {
     console.error('Failed to open portal:', error)
+    notification.error('Failed to open subscription portal. Please try again.')
   } finally {
     isManagingSubscription.value = false
   }
@@ -127,6 +130,10 @@ async function saveProfile() {
       experience_level: experienceLevel.value,
       unit_system: unitSystem.value,
     })
+    notification.success('Profile saved successfully!')
+  } catch (error) {
+    console.error('Save profile error:', error)
+    notification.error('Failed to save profile. Please try again.')
   } finally {
     saving.value = false
   }
@@ -225,8 +232,8 @@ async function handleSignOut() {
 
               <NButton
                 type="primary"
-                attr-type="submit"
                 :loading="saving"
+                @click="saveProfile"
               >
                 Save Changes
               </NButton>
@@ -248,7 +255,7 @@ async function handleSignOut() {
                   <NTag v-else type="default" size="small">Free</NTag>
                 </div>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {{ isPremium ? 'You have access to all AI features' : 'Upgrade to unlock AI workout generator and insights' }}
+                  {{ isPremium ? 'You have access to all premium features' : 'Upgrade to unlock premium features' }}
                 </p>
               </div>
               <NButton
