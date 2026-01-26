@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NInputNumber, NButton } from 'naive-ui'
+import { NInputNumber } from 'naive-ui'
 
 interface SetData {
   set_number: number
@@ -22,15 +22,33 @@ const workoutStore = useWorkoutStore()
 const weight = ref<number | null>(props.set.weight_kg)
 const reps = ref<number | null>(props.set.reps)
 const isCompleted = ref(!!props.set.completed_at)
+const isBodyweight = ref(props.set.weight_kg === 0)
 
-watch([weight, reps], ([newWeight, newReps]) => {
+// Check if this is a valid completed set
+function isValidSet(w: number | null, r: number | null, bw: boolean): boolean {
+  const hasValidReps = r !== null && r > 0
+  const hasValidWeight = bw ? true : (w !== null && w > 0)
+  return hasValidReps && hasValidWeight
+}
+
+// Toggle bodyweight mode
+function toggleBodyweight() {
+  isBodyweight.value = !isBodyweight.value
+  if (isBodyweight.value) {
+    weight.value = 0
+  } else {
+    weight.value = null
+  }
+}
+
+watch([weight, reps, isBodyweight], ([newWeight, newReps, newBodyweight]) => {
   workoutStore.updateSet(props.exerciseIndex, props.setIndex, {
     weight_kg: newWeight,
     reps: newReps,
   })
 
-  // Auto-complete when both values are valid
-  if (newWeight && newReps && newWeight > 0 && newReps > 0 && !isCompleted.value) {
+  // Auto-complete when values are valid
+  if (isValidSet(newWeight, newReps, newBodyweight) && !isCompleted.value) {
     workoutStore.completeSet(props.exerciseIndex, props.setIndex, {
       weight_kg: newWeight,
       reps: newReps,
@@ -39,11 +57,11 @@ watch([weight, reps], ([newWeight, newReps]) => {
   }
 
   // Uncomplete if values become invalid
-  if (isCompleted.value && (!newWeight || !newReps || newWeight <= 0 || newReps <= 0)) {
+  if (isCompleted.value && !isValidSet(newWeight, newReps, newBodyweight)) {
     workoutStore.uncompleteSet(props.exerciseIndex, props.setIndex)
     isCompleted.value = false
   }
-})
+}, { immediate: true })
 
 function removeSet() {
   workoutStore.removeSet(props.exerciseIndex, props.setIndex)
@@ -67,15 +85,39 @@ function removeSet() {
 
     <!-- Weight -->
     <div class="col-span-3">
-      <NInputNumber
-        v-model:value="weight"
-        placeholder="kg"
-        size="small"
-        :min="0"
-        :max="500"
-        :precision="1"
-        :show-button="false"
-      />
+      <div v-if="isBodyweight" class="flex items-center gap-1">
+        <span class="text-sm text-gray-500 dark:text-gray-400 flex-1">BW</span>
+        <button
+          class="p-1 rounded text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          @click="toggleBodyweight"
+          title="Switch to weighted"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div v-else class="flex items-center gap-1">
+        <NInputNumber
+          v-model:value="weight"
+          placeholder="kg"
+          size="small"
+          :min="0"
+          :max="500"
+          :precision="1"
+          :show-button="false"
+          class="flex-1"
+        />
+        <button
+          class="p-1 rounded text-xs text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
+          @click="toggleBodyweight"
+          title="Bodyweight"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Reps -->

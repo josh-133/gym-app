@@ -7,6 +7,34 @@ definePageMeta({
 
 const { measurements, loading, fetchMeasurements, addMeasurement, latestMeasurement, weightHistory, measurementsHistory } = useBodyMeasurements()
 const notification = useNotification()
+const auth = useAuth()
+
+// Unit system from user profile (defaults to metric)
+const unitSystem = computed(() => auth.profile.value?.unit_system || 'metric')
+const isImperial = computed(() => unitSystem.value === 'imperial')
+
+// Conversion functions
+const KG_TO_LBS = 2.20462
+const CM_TO_INCHES = 0.393701
+
+function convertWeight(kg: number): number {
+  return isImperial.value ? +(kg * KG_TO_LBS).toFixed(1) : kg
+}
+
+function convertLength(cm: number): number {
+  return isImperial.value ? +(cm * CM_TO_INCHES).toFixed(1) : cm
+}
+
+function convertWeightToMetric(value: number): number {
+  return isImperial.value ? +(value / KG_TO_LBS).toFixed(2) : value
+}
+
+function convertLengthToMetric(value: number): number {
+  return isImperial.value ? +(value / CM_TO_INCHES).toFixed(2) : value
+}
+
+const weightUnit = computed(() => isImperial.value ? 'lbs' : 'kg')
+const lengthUnit = computed(() => isImperial.value ? 'in' : 'cm')
 
 // Fetch measurements on mount
 onMounted(() => {
@@ -55,8 +83,8 @@ function resetForm() {
   }
 }
 
-// Current stats from latest measurement
-const currentStats = computed(() => {
+// Current stats from latest measurement (raw metric values)
+const currentStatsMetric = computed(() => {
   const latest = latestMeasurement.value
   return {
     weight: latest?.weight_kg || 0,
@@ -68,6 +96,22 @@ const currentStats = computed(() => {
     rightArm: latest?.bicep_cm || 0,
     leftThigh: latest?.thigh_cm || 0,
     rightThigh: latest?.thigh_cm || 0,
+  }
+})
+
+// Display stats in user's preferred unit system
+const currentStats = computed(() => {
+  const m = currentStatsMetric.value
+  return {
+    weight: convertWeight(m.weight),
+    bodyFat: m.bodyFat,
+    chest: convertLength(m.chest),
+    waist: convertLength(m.waist),
+    hips: convertLength(m.hips),
+    leftArm: convertLength(m.leftArm),
+    rightArm: convertLength(m.rightArm),
+    leftThigh: convertLength(m.leftThigh),
+    rightThigh: convertLength(m.rightThigh),
   }
 })
 
@@ -84,7 +128,8 @@ const weightChange = computed(() => {
   if (weightHistory.value.length < 2) return 0
   const first = weightHistory.value[0].weight
   const last = weightHistory.value[weightHistory.value.length - 1].weight
-  return +(last - first).toFixed(1)
+  const change = last - first
+  return +convertWeight(change).toFixed(1)
 })
 
 const bodyFatChange = computed(() => {
@@ -94,7 +139,7 @@ const bodyFatChange = computed(() => {
   return +(last - first).toFixed(1)
 })
 
-// Calculate measurement changes from history
+// Calculate measurement changes from history (in display units)
 const measurementChanges = computed(() => {
   if (measurementsHistory.value.length < 2) {
     return { chest: null, waist: null, hips: null, arms: null }
@@ -102,24 +147,32 @@ const measurementChanges = computed(() => {
   const first = measurementsHistory.value[0]
   const last = measurementsHistory.value[measurementsHistory.value.length - 1]
   return {
-    chest: first.chest && last.chest ? +(last.chest - first.chest).toFixed(1) : null,
-    waist: first.waist && last.waist ? +(last.waist - first.waist).toFixed(1) : null,
-    hips: first.hips && last.hips ? +(last.hips - first.hips).toFixed(1) : null,
-    arms: first.arms && last.arms ? +(last.arms - first.arms).toFixed(1) : null,
+    chest: first.chest && last.chest ? +convertLength(last.chest - first.chest).toFixed(1) : null,
+    waist: first.waist && last.waist ? +convertLength(last.waist - first.waist).toFixed(1) : null,
+    hips: first.hips && last.hips ? +convertLength(last.hips - first.hips).toFixed(1) : null,
+    arms: first.arms && last.arms ? +convertLength(last.arms - first.arms).toFixed(1) : null,
   }
 })
 
 const progressToGoalWeight = computed(() => {
-  const start = weightHistory.value[0]?.weight || currentStats.value.weight
-  const current = currentStats.value.weight
+  const start = weightHistory.value[0]?.weight || currentStatsMetric.value.weight
+  const current = currentStatsMetric.value.weight
   const target = goals.value.targetWeight
   const totalLoss = start - target
   const currentLoss = start - current
   return totalLoss > 0 ? Math.min(100, Math.round((currentLoss / totalLoss) * 100)) : 0
 })
 
-const maxWeight = computed(() => weightHistory.value.length > 0 ? Math.max(...weightHistory.value.map(h => h.weight)) + 2 : 100)
-const minWeight = computed(() => weightHistory.value.length > 0 ? Math.min(...weightHistory.value.map(h => h.weight)) - 2 : 60)
+// Weight history in display units for charts
+const weightHistoryDisplay = computed(() => {
+  return weightHistory.value.map(h => ({
+    ...h,
+    weight: convertWeight(h.weight),
+  }))
+})
+
+const maxWeight = computed(() => weightHistoryDisplay.value.length > 0 ? Math.max(...weightHistoryDisplay.value.map(h => h.weight)) + 2 : 100)
+const minWeight = computed(() => weightHistoryDisplay.value.length > 0 ? Math.min(...weightHistoryDisplay.value.map(h => h.weight)) - 2 : 60)
 const hasData = computed(() => measurements.value.length > 0)
 
 function formatDate(dateStr: string) {
@@ -127,6 +180,7 @@ function formatDate(dateStr: string) {
 }
 
 function getWeightPosition(weight: number) {
+  // weight is already in display units from weightHistoryDisplay
   return 100 - ((weight - minWeight.value) / (maxWeight.value - minWeight.value)) * 100
 }
 
@@ -139,15 +193,20 @@ function openAddModal(type: string) {
 async function saveMeasurement() {
   saving.value = true
   try {
+    // Convert imperial inputs to metric for storage
     await addMeasurement({
       measured_at: new Date(newMeasurement.value.date).toISOString(),
-      weight_kg: newMeasurement.value.weight,
+      weight_kg: newMeasurement.value.weight ? convertWeightToMetric(newMeasurement.value.weight) : null,
       body_fat_percent: newMeasurement.value.bodyFat,
-      chest_cm: newMeasurement.value.chest,
-      waist_cm: newMeasurement.value.waist,
-      hips_cm: newMeasurement.value.hips,
-      bicep_cm: newMeasurement.value.leftArm || newMeasurement.value.rightArm,
-      thigh_cm: newMeasurement.value.leftThigh || newMeasurement.value.rightThigh,
+      chest_cm: newMeasurement.value.chest ? convertLengthToMetric(newMeasurement.value.chest) : null,
+      waist_cm: newMeasurement.value.waist ? convertLengthToMetric(newMeasurement.value.waist) : null,
+      hips_cm: newMeasurement.value.hips ? convertLengthToMetric(newMeasurement.value.hips) : null,
+      bicep_cm: newMeasurement.value.leftArm || newMeasurement.value.rightArm
+        ? convertLengthToMetric(newMeasurement.value.leftArm || newMeasurement.value.rightArm || 0)
+        : null,
+      thigh_cm: newMeasurement.value.leftThigh || newMeasurement.value.rightThigh
+        ? convertLengthToMetric(newMeasurement.value.leftThigh || newMeasurement.value.rightThigh || 0)
+        : null,
     })
     showAddModal.value = false
     resetForm()
@@ -219,9 +278,9 @@ async function saveMeasurement() {
       <NCard class="!bg-gradient-to-br from-primary-500 to-accent-500 shadow-xl">
         <div class="text-white text-center">
           <p class="text-white/80 text-sm">Current Weight</p>
-          <p class="text-3xl font-bold mt-1">{{ currentStats.weight }}kg</p>
+          <p class="text-3xl font-bold mt-1">{{ currentStats.weight }}{{ weightUnit }}</p>
           <p class="text-sm mt-2" :class="weightChange < 0 ? 'text-green-200' : 'text-red-200'">
-            {{ weightChange > 0 ? '+' : '' }}{{ weightChange }}kg
+            {{ weightChange > 0 ? '+' : '' }}{{ weightChange }}{{ weightUnit }}
           </p>
         </div>
       </NCard>
@@ -237,14 +296,14 @@ async function saveMeasurement() {
       <NCard class="!bg-gradient-to-br from-energy-500 to-warning-500 shadow-xl">
         <div class="text-white text-center">
           <p class="text-white/80 text-sm">Muscle Mass</p>
-          <p class="text-3xl font-bold mt-1">{{ currentStats.bodyFat > 0 ? (currentStats.weight * (1 - currentStats.bodyFat / 100)).toFixed(1) : '—' }}kg</p>
+          <p class="text-3xl font-bold mt-1">{{ currentStats.bodyFat > 0 ? (currentStats.weight * (1 - currentStats.bodyFat / 100)).toFixed(1) : '—' }}{{ weightUnit }}</p>
           <p class="text-sm mt-2 text-white/60">estimated</p>
         </div>
       </NCard>
       <NCard class="!bg-gradient-to-br from-accent-500 to-primary-500 shadow-xl">
         <div class="text-white text-center">
           <p class="text-white/80 text-sm">BMI</p>
-          <p class="text-3xl font-bold mt-1">{{ (currentStats.weight / (1.78 * 1.78)).toFixed(1) }}</p>
+          <p class="text-3xl font-bold mt-1">{{ (currentStatsMetric.weight / (1.78 * 1.78)).toFixed(1) }}</p>
           <p class="text-sm mt-2 text-white/60">Normal range</p>
         </div>
       </NCard>
@@ -257,7 +316,7 @@ async function saveMeasurement() {
         <div class="flex gap-4 mb-4">
           <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded-full bg-primary-500"></div>
-            <span class="text-sm text-gray-600 dark:text-gray-400">Weight (kg)</span>
+            <span class="text-sm text-gray-600 dark:text-gray-400">Weight ({{ weightUnit }})</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded-full bg-accent-500"></div>
@@ -294,13 +353,13 @@ async function saveMeasurement() {
 
               <!-- Area -->
               <path
-                :d="`M ${weightHistory.map((h, i) => `${(i / (weightHistory.length - 1)) * 100}%,${getWeightPosition(h.weight)}%`).join(' L ')} L 100%,100% L 0%,100% Z`"
+                :d="`M ${weightHistoryDisplay.map((h, i) => `${(i / (weightHistoryDisplay.length - 1)) * 100}%,${getWeightPosition(h.weight)}%`).join(' L ')} L 100%,100% L 0%,100% Z`"
                 fill="url(#weightFill)"
               />
 
               <!-- Line -->
               <polyline
-                :points="weightHistory.map((h, i) => `${(i / (weightHistory.length - 1)) * 100}%,${getWeightPosition(h.weight)}%`).join(' ')"
+                :points="weightHistoryDisplay.map((h, i) => `${(i / (weightHistoryDisplay.length - 1)) * 100}%,${getWeightPosition(h.weight)}%`).join(' ')"
                 fill="none"
                 stroke="#a855f7"
                 stroke-width="3"
@@ -308,9 +367,9 @@ async function saveMeasurement() {
               />
 
               <!-- Points -->
-              <g v-for="(h, i) in weightHistory" :key="i">
+              <g v-for="(h, i) in weightHistoryDisplay" :key="i">
                 <circle
-                  :cx="`${(i / (weightHistory.length - 1)) * 100}%`"
+                  :cx="`${(i / (weightHistoryDisplay.length - 1)) * 100}%`"
                   :cy="`${getWeightPosition(h.weight)}%`"
                   r="5"
                   fill="white"
@@ -324,7 +383,7 @@ async function saveMeasurement() {
 
         <!-- X-axis -->
         <div class="ml-12 flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
-          <span v-for="h in weightHistory" :key="h.date">{{ formatDate(h.date) }}</span>
+          <span v-for="h in weightHistoryDisplay" :key="h.date">{{ formatDate(h.date) }}</span>
         </div>
       </div>
 
@@ -332,7 +391,7 @@ async function saveMeasurement() {
       <div class="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
         <div class="flex items-center justify-between mb-2">
           <span class="font-medium text-gray-900 dark:text-white">Progress to Goal</span>
-          <span class="text-sm text-gray-500 dark:text-gray-400">{{ currentStats.weight }}kg → {{ goals.targetWeight }}kg</span>
+          <span class="text-sm text-gray-500 dark:text-gray-400">{{ currentStats.weight }}{{ weightUnit }} → {{ convertWeight(goals.targetWeight) }}{{ weightUnit }}</span>
         </div>
         <div class="h-4 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
           <div
@@ -340,7 +399,7 @@ async function saveMeasurement() {
             :style="{ width: `${progressToGoalWeight}%` }"
           ></div>
         </div>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">{{ progressToGoalWeight }}% complete · {{ (currentStats.weight - goals.targetWeight).toFixed(1) }}kg to go</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">{{ progressToGoalWeight }}% complete · {{ convertWeight(currentStatsMetric.weight - goals.targetWeight).toFixed(1) }}{{ weightUnit }} to go</p>
       </div>
     </NCard>
 
@@ -371,23 +430,23 @@ async function saveMeasurement() {
 
               <!-- Measurement labels -->
               <div class="absolute top-16 -left-8 text-xs">
-                <span class="font-bold text-primary-600 dark:text-primary-400">{{ currentStats.chest }}cm</span>
+                <span class="font-bold text-primary-600 dark:text-primary-400">{{ currentStats.chest }}{{ lengthUnit }}</span>
                 <span class="text-gray-500 dark:text-gray-400 ml-1">Chest</span>
               </div>
               <div class="absolute top-24 -right-8 text-xs text-right">
-                <span class="font-bold text-accent-600 dark:text-accent-400">{{ currentStats.waist }}cm</span>
+                <span class="font-bold text-accent-600 dark:text-accent-400">{{ currentStats.waist }}{{ lengthUnit }}</span>
                 <span class="text-gray-500 dark:text-gray-400 ml-1">Waist</span>
               </div>
               <div class="absolute top-32 -left-8 text-xs">
-                <span class="font-bold text-secondary-600 dark:text-secondary-400">{{ currentStats.hips }}cm</span>
+                <span class="font-bold text-secondary-600 dark:text-secondary-400">{{ currentStats.hips }}{{ lengthUnit }}</span>
                 <span class="text-gray-500 dark:text-gray-400 ml-1">Hips</span>
               </div>
               <div class="absolute top-20 -right-16 text-xs text-right">
-                <span class="font-bold text-success-600 dark:text-success-400">{{ currentStats.rightArm }}cm</span>
+                <span class="font-bold text-success-600 dark:text-success-400">{{ currentStats.rightArm }}{{ lengthUnit }}</span>
                 <span class="text-gray-500 dark:text-gray-400 ml-1">Arms</span>
               </div>
               <div class="absolute bottom-4 -left-10 text-xs">
-                <span class="font-bold text-energy-600 dark:text-energy-400">{{ currentStats.leftThigh }}cm</span>
+                <span class="font-bold text-energy-600 dark:text-energy-400">{{ currentStats.leftThigh }}{{ lengthUnit }}</span>
                 <span class="text-gray-500 dark:text-gray-400 ml-1">Thighs</span>
               </div>
             </div>
@@ -397,30 +456,30 @@ async function saveMeasurement() {
           <div class="grid grid-cols-2 gap-3">
             <div class="p-3 bg-primary-50 dark:bg-primary-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Chest</p>
-              <p class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ currentStats.chest || '—' }}cm</p>
+              <p class="text-xl font-bold text-primary-600 dark:text-primary-400">{{ currentStats.chest || '—' }}{{ lengthUnit }}</p>
               <p v-if="measurementChanges.chest !== null" class="text-xs" :class="measurementChanges.chest >= 0 ? 'text-success-600' : 'text-red-500'">
-                {{ measurementChanges.chest > 0 ? '+' : '' }}{{ measurementChanges.chest }}cm
+                {{ measurementChanges.chest > 0 ? '+' : '' }}{{ measurementChanges.chest }}{{ lengthUnit }}
               </p>
             </div>
             <div class="p-3 bg-accent-50 dark:bg-accent-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Waist</p>
-              <p class="text-xl font-bold text-accent-600 dark:text-accent-400">{{ currentStats.waist || '—' }}cm</p>
+              <p class="text-xl font-bold text-accent-600 dark:text-accent-400">{{ currentStats.waist || '—' }}{{ lengthUnit }}</p>
               <p v-if="measurementChanges.waist !== null" class="text-xs" :class="measurementChanges.waist <= 0 ? 'text-success-600' : 'text-red-500'">
-                {{ measurementChanges.waist > 0 ? '+' : '' }}{{ measurementChanges.waist }}cm
+                {{ measurementChanges.waist > 0 ? '+' : '' }}{{ measurementChanges.waist }}{{ lengthUnit }}
               </p>
             </div>
             <div class="p-3 bg-secondary-50 dark:bg-secondary-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Hips</p>
-              <p class="text-xl font-bold text-secondary-600 dark:text-secondary-400">{{ currentStats.hips || '—' }}cm</p>
+              <p class="text-xl font-bold text-secondary-600 dark:text-secondary-400">{{ currentStats.hips || '—' }}{{ lengthUnit }}</p>
               <p v-if="measurementChanges.hips !== null" class="text-xs" :class="measurementChanges.hips <= 0 ? 'text-success-600' : 'text-red-500'">
-                {{ measurementChanges.hips > 0 ? '+' : '' }}{{ measurementChanges.hips }}cm
+                {{ measurementChanges.hips > 0 ? '+' : '' }}{{ measurementChanges.hips }}{{ lengthUnit }}
               </p>
             </div>
             <div class="p-3 bg-success-50 dark:bg-success-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Arms (avg)</p>
-              <p class="text-xl font-bold text-success-600 dark:text-success-400">{{ currentStats.leftArm || currentStats.rightArm ? ((currentStats.leftArm + currentStats.rightArm) / 2).toFixed(1) : '—' }}cm</p>
+              <p class="text-xl font-bold text-success-600 dark:text-success-400">{{ currentStats.leftArm || currentStats.rightArm ? ((currentStats.leftArm + currentStats.rightArm) / 2).toFixed(1) : '—' }}{{ lengthUnit }}</p>
               <p v-if="measurementChanges.arms !== null" class="text-xs" :class="measurementChanges.arms >= 0 ? 'text-success-600' : 'text-red-500'">
-                {{ measurementChanges.arms > 0 ? '+' : '' }}{{ measurementChanges.arms }}cm
+                {{ measurementChanges.arms > 0 ? '+' : '' }}{{ measurementChanges.arms }}{{ lengthUnit }}
               </p>
             </div>
           </div>
@@ -480,11 +539,11 @@ async function saveMeasurement() {
           <thead>
             <tr class="text-left text-sm text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-800">
               <th class="pb-3 font-medium">Date</th>
-              <th class="pb-3 font-medium">Chest</th>
-              <th class="pb-3 font-medium">Waist</th>
-              <th class="pb-3 font-medium">Hips</th>
-              <th class="pb-3 font-medium">Arms</th>
-              <th class="pb-3 font-medium">Thighs</th>
+              <th class="pb-3 font-medium">Chest ({{ lengthUnit }})</th>
+              <th class="pb-3 font-medium">Waist ({{ lengthUnit }})</th>
+              <th class="pb-3 font-medium">Hips ({{ lengthUnit }})</th>
+              <th class="pb-3 font-medium">Arms ({{ lengthUnit }})</th>
+              <th class="pb-3 font-medium">Thighs ({{ lengthUnit }})</th>
             </tr>
           </thead>
           <tbody>
@@ -498,11 +557,11 @@ async function saveMeasurement() {
                 {{ formatDate(m.date) }}
                 <NTag v-if="index === measurementsHistory.length - 1" type="info" size="small" class="ml-2">Latest</NTag>
               </td>
-              <td class="py-3 text-gray-600 dark:text-gray-300">{{ m.chest }}cm</td>
-              <td class="py-3 text-gray-600 dark:text-gray-300">{{ m.waist }}cm</td>
-              <td class="py-3 text-gray-600 dark:text-gray-300">{{ m.hips }}cm</td>
-              <td class="py-3 text-gray-600 dark:text-gray-300">{{ m.arms }}cm</td>
-              <td class="py-3 text-gray-600 dark:text-gray-300">{{ m.thighs }}cm</td>
+              <td class="py-3 text-gray-600 dark:text-gray-300">{{ convertLength(m.chest) }}</td>
+              <td class="py-3 text-gray-600 dark:text-gray-300">{{ convertLength(m.waist) }}</td>
+              <td class="py-3 text-gray-600 dark:text-gray-300">{{ convertLength(m.hips) }}</td>
+              <td class="py-3 text-gray-600 dark:text-gray-300">{{ convertLength(m.arms) }}</td>
+              <td class="py-3 text-gray-600 dark:text-gray-300">{{ convertLength(m.thighs) }}</td>
             </tr>
           </tbody>
         </table>
@@ -525,8 +584,8 @@ async function saveMeasurement() {
 
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Weight (kg)</label>
-            <NInputNumber v-model:value="newMeasurement.weight" :precision="1" placeholder="82.5" class="w-full" />
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Weight ({{ weightUnit }})</label>
+            <NInputNumber v-model:value="newMeasurement.weight" :precision="1" :placeholder="isImperial ? '180' : '82'" class="w-full" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Body Fat (%)</label>
@@ -535,35 +594,35 @@ async function saveMeasurement() {
         </div>
 
         <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-          <p class="font-medium text-gray-900 dark:text-white mb-3">Measurements (cm)</p>
+          <p class="font-medium text-gray-900 dark:text-white mb-3">Measurements ({{ lengthUnit }})</p>
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Chest</label>
-              <NInputNumber v-model:value="newMeasurement.chest" :precision="1" placeholder="102" class="w-full" />
+              <NInputNumber v-model:value="newMeasurement.chest" :precision="1" :placeholder="isImperial ? '40' : '102'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Waist</label>
-              <NInputNumber v-model:value="newMeasurement.waist" :precision="1" placeholder="84" class="w-full" />
+              <NInputNumber v-model:value="newMeasurement.waist" :precision="1" :placeholder="isImperial ? '33' : '84'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Hips</label>
-              <NInputNumber v-model:value="newMeasurement.hips" :precision="1" placeholder="98" class="w-full" />
+              <NInputNumber v-model:value="newMeasurement.hips" :precision="1" :placeholder="isImperial ? '38' : '98'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Left Arm</label>
-              <NInputNumber v-model:value="newMeasurement.leftArm" :precision="1" placeholder="38" class="w-full" />
+              <NInputNumber v-model:value="newMeasurement.leftArm" :precision="1" :placeholder="isImperial ? '15' : '38'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Right Arm</label>
-              <NInputNumber v-model:value="newMeasurement.rightArm" :precision="1" placeholder="38.5" class="w-full" />
+              <NInputNumber v-model:value="newMeasurement.rightArm" :precision="1" :placeholder="isImperial ? '15' : '38'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Left Thigh</label>
-              <NInputNumber v-model:value="newMeasurement.leftThigh" :precision="1" placeholder="58" class="w-full" />
+              <NInputNumber v-model:value="newMeasurement.leftThigh" :precision="1" :placeholder="isImperial ? '23' : '58'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Right Thigh</label>
-              <NInputNumber v-model:value="newMeasurement.rightThigh" :precision="1" placeholder="58.5" class="w-full" />
+              <NInputNumber v-model:value="newMeasurement.rightThigh" :precision="1" :placeholder="isImperial ? '23' : '58'" class="w-full" />
             </div>
           </div>
         </div>
