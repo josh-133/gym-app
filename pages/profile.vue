@@ -120,6 +120,26 @@ const unitOptions = [
   { label: 'Imperial (lb, mi)', value: 'imperial' },
 ]
 
+// Auto-save unit system when changed (separate from profile form)
+const savingUnits = ref(false)
+watch(unitSystem, async (newValue, oldValue) => {
+  // Only save if the value actually changed and profile is loaded
+  if (oldValue && newValue !== oldValue && auth.profile.value) {
+    savingUnits.value = true
+    try {
+      await auth.updateProfile({ unit_system: newValue })
+      notification.success('Unit system updated!')
+    } catch (error) {
+      console.error('Failed to update unit system:', error)
+      notification.error('Failed to update unit system.')
+      // Revert on error
+      unitSystem.value = oldValue
+    } finally {
+      savingUnits.value = false
+    }
+  }
+})
+
 async function saveProfile() {
   saving.value = true
   try {
