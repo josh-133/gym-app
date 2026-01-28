@@ -7,6 +7,7 @@ definePageMeta({
 
 const auth = useAuth()
 const { activeGoals, fetchGoals, getProgressPercentage, getGoalTypeInfo } = useGoals()
+const { formatVolume } = useUnits()
 const {
   workouts: localWorkouts,
   loadWorkouts: loadLocalWorkouts,
@@ -124,13 +125,6 @@ function formatDuration(minutes: number) {
     return `${hrs}h ${mins}m`
   }
   return `${mins}m`
-}
-
-function formatVolume(kg: number) {
-  if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(1)}k kg`
-  }
-  return `${kg} kg`
 }
 
 function formatDate(dateStr: string) {

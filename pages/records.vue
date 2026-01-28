@@ -6,6 +6,7 @@ definePageMeta({
 })
 
 const { calculateAllPRs, loadWorkouts, getPRsThisMonth, calculateDayStreak } = useWorkoutHistory()
+const { convertWeight, weightUnit } = useUnits()
 
 // Day streak calculated from workout history
 const dayStreak = computed(() => calculateDayStreak())
@@ -15,41 +16,42 @@ onMounted(() => {
   loadWorkouts()
 })
 
-// Personal records calculated from workout history
+// Personal records calculated from workout history (with unit conversion)
 const personalRecords = computed(() => {
   const prs = calculateAllPRs()
   return prs.map(pr => ({
     id: pr.id,
     exercise: pr.exercise,
-    value: pr.weight,
+    value: convertWeight(pr.weight) ?? pr.weight,
     reps: pr.reps,
-    unit: 'kg',
+    unit: weightUnit.value,
     date: pr.date,
   })).sort((a, b) => a.exercise.localeCompare(b.exercise))
 })
 
-// Recent PRs (set this month)
+// Recent PRs (set this month) with unit conversion
 const recentPRs = computed(() => {
   const prs = getPRsThisMonth()
   return prs.map(pr => ({
     id: pr.id,
     exercise: pr.exercise,
-    value: pr.weight,
+    value: convertWeight(pr.weight) ?? pr.weight,
     reps: pr.reps,
-    unit: 'kg',
+    unit: weightUnit.value,
     date: pr.date,
   })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 })
 
-// Calculate Big 3 total (bench, squat, deadlift)
+// Calculate Big 3 total (bench, squat, deadlift) with unit conversion
 const big3Total = computed(() => {
   const prs = calculateAllPRs()
   const bench = prs.find(pr => pr.exercise.toLowerCase().includes('bench press'))
   const squat = prs.find(pr => pr.exercise.toLowerCase().includes('squat') && !pr.exercise.toLowerCase().includes('split'))
   const deadlift = prs.find(pr => pr.exercise.toLowerCase().includes('deadlift') && !pr.exercise.toLowerCase().includes('romanian'))
 
-  const total = (bench?.weight || 0) + (squat?.weight || 0) + (deadlift?.weight || 0)
-  return total > 0 ? total : null
+  const totalKg = (bench?.weight || 0) + (squat?.weight || 0) + (deadlift?.weight || 0)
+  if (totalKg <= 0) return null
+  return convertWeight(totalKg)
 })
 
 function formatDate(dateStr: string) {
@@ -96,7 +98,7 @@ function formatDate(dateStr: string) {
       </NCard>
       <NCard class="text-center">
         <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{{ big3Total ? big3Total : '—' }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Total (Big 3) kg</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Total (Big 3) {{ weightUnit }}</p>
       </NCard>
       <NCard class="text-center">
         <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">{{ dayStreak || '—' }}</p>

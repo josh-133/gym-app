@@ -18,6 +18,7 @@ const props = defineProps<{
 }>()
 
 const workoutStore = useWorkoutStore()
+const { weightUnit } = useUnits()
 
 const weight = ref<number | null>(props.set.weight_kg)
 const reps = ref<number | null>(props.set.reps)
@@ -100,7 +101,7 @@ function removeSet() {
       <div v-else class="flex items-center gap-1">
         <NInputNumber
           v-model:value="weight"
-          placeholder="kg"
+          :placeholder="weightUnit"
           size="small"
           :min="0"
           :max="500"
