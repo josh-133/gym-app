@@ -10,6 +10,7 @@ const route = useRoute()
 const exerciseId = route.params.id as string
 
 const { customExercisesAsDefinitions, fetchCustomExercises } = useCustomExercises()
+const { convertWeight, weightUnit } = useUnits()
 
 // Fetch custom exercises on mount
 onMounted(() => {
@@ -118,7 +119,7 @@ function getDifficultyColor(difficulty: string) {
           <div>
             <p class="text-sm text-yellow-700 dark:text-yellow-300">Personal Record</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-white">
-              {{ personalRecord.weight }}kg × {{ personalRecord.reps }} reps
+              {{ convertWeight(personalRecord.weight) }}{{ weightUnit }} × {{ personalRecord.reps }} reps
             </p>
             <p class="text-sm text-gray-500 dark:text-gray-400">Set on {{ formatDate(personalRecord.date) }}</p>
           </div>
@@ -186,10 +187,10 @@ function getDifficultyColor(difficulty: string) {
                 </div>
                 <div class="text-right">
                   <p class="font-semibold text-gray-900 dark:text-white">
-                    {{ session.bestWeight }}kg × {{ session.bestReps }}
+                    {{ convertWeight(session.bestWeight) }}{{ weightUnit }} × {{ session.bestReps }}
                   </p>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ session.volume }}kg volume
+                    {{ convertWeight(session.volume) }}{{ weightUnit }} volume
                   </p>
                 </div>
               </div>

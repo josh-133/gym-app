@@ -181,22 +181,14 @@ async function handleSignOut() {
     <!-- Profile Header -->
     <NCard>
       <div class="flex flex-col sm:flex-row items-center gap-6">
-        <div class="relative">
-          <NAvatar
-            round
-            :size="100"
-            :src="auth.profile.value?.avatar_url || undefined"
-            class="text-3xl"
-          >
-            {{ auth.profile.value?.display_name?.[0] || auth.profile.value?.username?.[0] || 'U' }}
-          </NAvatar>
-          <button class="absolute bottom-0 right-0 p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
+        <NAvatar
+          round
+          :size="100"
+          :src="auth.profile.value?.avatar_url || undefined"
+          class="text-3xl"
+        >
+          {{ auth.profile.value?.display_name?.[0] || auth.profile.value?.username?.[0] || 'U' }}
+        </NAvatar>
         <div class="text-center sm:text-left">
           <div class="flex items-center gap-2">
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">

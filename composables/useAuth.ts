@@ -21,6 +21,7 @@ export function useAuth() {
       if (!profile.value) {
         await fetchProfile()
       }
+      loading.value = false
       return
     }
 

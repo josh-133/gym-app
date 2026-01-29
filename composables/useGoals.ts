@@ -157,7 +157,8 @@ export function useGoals() {
 
   // Calculate progress percentage
   function getProgressPercentage(goal: UserGoal): number {
-    if (goal.target_value === 0) return 0
+    if (!goal.target_value || goal.target_value === 0) return 0
+    if (goal.current_value === null || goal.current_value === undefined) return 0
     const progress = (goal.current_value / goal.target_value) * 100
     return Math.min(Math.round(progress), 100)
   }

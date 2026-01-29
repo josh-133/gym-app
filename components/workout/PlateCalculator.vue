@@ -8,17 +8,29 @@ import {
   IMPERIAL_PLATES_IN_KG,
 } from '~/utils/fitness'
 
-// Bar weight options
-const barOptions = [
-  { label: 'Olympic Bar (20kg)', value: 20 },
-  { label: 'Women\'s Bar (15kg)', value: 15 },
-  { label: 'EZ Curl Bar (10kg)', value: 10 },
-  { label: 'Smith Machine (0kg)', value: 0 },
-]
+const { isImperial } = useUnits()
+
+// Bar weight options - dynamic based on unit system
+const barOptions = computed(() => {
+  if (!useMetric.value) {
+    return [
+      { label: 'Olympic Bar (45lb)', value: 20 },
+      { label: 'Women\'s Bar (33lb)', value: 15 },
+      { label: 'EZ Curl Bar (22lb)', value: 10 },
+      { label: 'Smith Machine (0lb)', value: 0 },
+    ]
+  }
+  return [
+    { label: 'Olympic Bar (20kg)', value: 20 },
+    { label: 'Women\'s Bar (15kg)', value: 15 },
+    { label: 'EZ Curl Bar (10kg)', value: 10 },
+    { label: 'Smith Machine (0kg)', value: 0 },
+  ]
+})
 
 const targetWeight = ref<number | null>(100)
 const barWeight = ref(20)
-const useMetric = ref(true)
+const useMetric = ref(!isImperial.value) // Default to user's profile setting
 
 const plates = computed(() => useMetric.value ? METRIC_PLATES : IMPERIAL_PLATES_IN_KG)
 
@@ -71,7 +83,7 @@ function formatPlateLabel(kg: number): string {
         <NSelect
           v-model:value="barWeight"
           :options="barOptions"
-          class="w-48"
+          class="w-52"
         />
       </div>
 

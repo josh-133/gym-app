@@ -8,6 +8,7 @@ definePageMeta({
 const route = useRoute()
 const workoutId = route.params.id as string
 const { getWorkout, loadWorkouts } = useWorkoutHistory()
+const { convertWeight, weightUnit, formatVolume } = useUnits()
 
 // Workout data from history
 interface WorkoutData {
@@ -212,8 +213,8 @@ function getSetTypeColor(type: string) {
           <p class="text-sm text-gray-500 dark:text-gray-400">Total Sets</p>
         </NCard>
         <NCard class="text-center">
-          <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ (totalVolume / 1000).toFixed(1) }}k</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">Volume (kg)</p>
+          <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatVolume(totalVolume) }}</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Volume</p>
         </NCard>
       </div>
 
@@ -271,7 +272,7 @@ function getSetTypeColor(type: string) {
                   <td class="py-2">
                     <NTag :type="getSetTypeColor(set.type)" size="small">{{ set.type }}</NTag>
                   </td>
-                  <td class="py-2 text-gray-900 dark:text-white">{{ set.weight }} kg</td>
+                  <td class="py-2 text-gray-900 dark:text-white">{{ convertWeight(set.weight) }} {{ weightUnit }}</td>
                   <td class="py-2 text-gray-900 dark:text-white">{{ set.reps }}</td>
                   <td class="py-2">
                     <span v-if="set.is_pr" class="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400 text-sm font-medium">

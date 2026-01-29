@@ -6,6 +6,7 @@ definePageMeta({
 })
 
 const { workouts, loadWorkouts } = useWorkoutHistory()
+const { convertWeight, weightUnit, formatVolume } = useUnits()
 
 // Ensure workouts are loaded
 onMounted(() => {
@@ -191,7 +192,7 @@ const prTimeline = computed(() => {
                 weight: set.weight,
                 reps: set.reps,
                 date: workout.date,
-                improvement: `+${improvement}kg (1RM)`,
+                improvement: `+${convertWeight(improvement)}${weightUnit.value} (1RM)`,
               })
             }
             exerciseBests[ex.name] = {
@@ -277,12 +278,11 @@ const maxWeeklyVolume = computed(() => {
   return max * 1.2 // Add 20% padding
 })
 
-function formatVolume(kg: number) {
-  if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(1)}k`
-  }
-  return `${kg}`
-}
+// Computed values with unit conversion
+const maxWeightDisplay = computed(() => convertWeight(maxWeight.value))
+const minWeightDisplay = computed(() => convertWeight(minWeight.value))
+const maxEstimated1RMDisplay = computed(() => convertWeight(maxEstimated1RM.value))
+const weightIncreaseDisplay = computed(() => convertWeight(weightIncrease.value))
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -338,7 +338,7 @@ function getProgressPercentage(value: number, max: number) {
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div class="stat-card">
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Volume</p>
-          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ formatVolume(totalVolume) }}kg</p>
+          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ formatVolume(totalVolume) }}</p>
           <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this period</p>
         </div>
         <div class="stat-card">
@@ -348,12 +348,12 @@ function getProgressPercentage(value: number, max: number) {
         </div>
         <div class="stat-card">
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Best {{ selectedExerciseLabel }}</p>
-          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxWeight || '—' }}{{ maxWeight ? 'kg' : '' }}</p>
+          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxWeightDisplay || '—' }}{{ maxWeight ? weightUnit : '' }}</p>
           <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">{{ lastReps ? `x ${lastReps} reps` : 'no data' }}</p>
         </div>
         <div class="stat-card">
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Est. 1RM</p>
-          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxEstimated1RM || '—' }}{{ maxEstimated1RM ? 'kg' : '' }}</p>
+          <p class="text-3xl font-bold text-primary-900 dark:text-white">{{ maxEstimated1RMDisplay || '—' }}{{ maxEstimated1RM ? weightUnit : '' }}</p>
           <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">{{ selectedExerciseLabel.toLowerCase() }}</p>
         </div>
       </div>
@@ -384,11 +384,11 @@ function getProgressPercentage(value: number, max: number) {
         <div v-else class="relative">
           <!-- Y-axis labels -->
           <div class="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-gray-400 dark:text-gray-500">
-            <span>{{ maxWeight + 10 }}kg</span>
-            <span>{{ Math.round((maxWeight + 10) * 0.75) }}kg</span>
-            <span>{{ Math.round((maxWeight + 10) * 0.5) }}kg</span>
-            <span>{{ Math.round((maxWeight + 10) * 0.25) }}kg</span>
-            <span>0kg</span>
+            <span>{{ convertWeight(maxWeight + 10) }}{{ weightUnit }}</span>
+            <span>{{ convertWeight(Math.round((maxWeight + 10) * 0.75)) }}{{ weightUnit }}</span>
+            <span>{{ convertWeight(Math.round((maxWeight + 10) * 0.5)) }}{{ weightUnit }}</span>
+            <span>{{ convertWeight(Math.round((maxWeight + 10) * 0.25)) }}{{ weightUnit }}</span>
+            <span>0{{ weightUnit }}</span>
           </div>
 
           <!-- Chart -->
@@ -453,7 +453,7 @@ function getProgressPercentage(value: number, max: number) {
         <!-- Stats row -->
         <div v-if="exerciseProgress.length > 0" class="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
           <div class="text-center">
-            <p class="text-2xl font-bold text-primary-900 dark:text-white">+{{ weightIncrease }}kg</p>
+            <p class="text-2xl font-bold text-primary-900 dark:text-white">+{{ weightIncreaseDisplay }}{{ weightUnit }}</p>
             <p class="text-sm text-gray-500 dark:text-gray-400">Weight Increase</p>
           </div>
           <div class="text-center">
@@ -478,7 +478,7 @@ function getProgressPercentage(value: number, max: number) {
             <div v-for="muscle in muscleVolumeData" :key="muscle.muscle">
               <div class="flex items-center justify-between mb-2">
                 <span class="font-medium text-primary-900 dark:text-white">{{ muscle.muscle }}</span>
-                <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatVolume(muscle.volume) }}kg</span>
+                <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatVolume(muscle.volume) }}</span>
               </div>
               <div class="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <div
@@ -513,7 +513,7 @@ function getProgressPercentage(value: number, max: number) {
                   <span class="text-xs px-2 py-0.5 rounded-full bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400 font-medium">{{ pr.improvement }}</span>
                 </div>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ pr.weight }}kg x {{ pr.reps }} reps · {{ formatDate(pr.date) }}
+                  {{ convertWeight(pr.weight) }}{{ weightUnit }} x {{ pr.reps }} reps · {{ formatDate(pr.date) }}
                 </p>
               </div>
             </div>

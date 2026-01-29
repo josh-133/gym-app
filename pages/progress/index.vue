@@ -13,6 +13,7 @@ const {
   setWeeklyGoalTarget,
   loadWeeklyGoal,
 } = useWorkoutHistory()
+const { formatVolume } = useUnits()
 
 // Weekly goal edit modal
 const showWeeklyGoalModal = ref(false)
@@ -216,16 +217,6 @@ const analyticsCards = [
     gradient: 'from-success-500 via-secondary-500 to-primary-500',
   },
 ]
-
-function formatVolume(kg: number) {
-  if (kg >= 1000000) {
-    return `${(kg / 1000000).toFixed(1)}M kg`
-  }
-  if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(1)}k kg`
-  }
-  return `${kg} kg`
-}
 
 function formatDuration(minutes: number) {
   const hours = Math.floor(minutes / 60)

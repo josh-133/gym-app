@@ -128,11 +128,11 @@ export function useBodyMeasurements() {
     return measurements.value
       .map((m) => ({
         date: m.measured_at,
-        chest: m.chest_cm || 0,
-        waist: m.waist_cm || 0,
-        hips: m.hips_cm || 0,
-        arms: m.bicep_cm || 0,
-        thighs: m.thigh_cm || 0,
+        chest: m.chest_cm ?? null,
+        waist: m.waist_cm ?? null,
+        hips: m.hips_cm ?? null,
+        arms: m.bicep_cm ?? null,
+        thighs: m.thigh_cm ?? null,
       }))
       .reverse()
   })

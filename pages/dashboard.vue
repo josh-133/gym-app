@@ -351,18 +351,18 @@ function formatDate(dateStr: string) {
       <div class="space-y-4">
         <div class="flex items-center justify-between">
           <span class="text-gray-600 dark:text-gray-400">Workouts completed</span>
-          <span class="font-semibold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }} / {{ weeklyGoalTarget }}</span>
+          <span class="font-semibold text-primary-900 dark:text-white">{{ stats.workoutsThisWeek }} / {{ weeklyGoalTarget ?? 5 }}</span>
         </div>
         <NProgress
           type="line"
-          :percentage="Math.min((stats.workoutsThisWeek / weeklyGoalTarget) * 100, 100)"
+          :percentage="Math.min((stats.workoutsThisWeek / (weeklyGoalTarget ?? 5)) * 100, 100)"
           :height="8"
           :border-radius="4"
           :fill-border-radius="4"
           status="success"
         />
         <p class="text-sm text-gray-500 dark:text-gray-400">
-          {{ weeklyGoalTarget - stats.workoutsThisWeek > 0 ? `${weeklyGoalTarget - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
+          {{ (weeklyGoalTarget ?? 5) - stats.workoutsThisWeek > 0 ? `${(weeklyGoalTarget ?? 5) - stats.workoutsThisWeek} more to reach your goal!` : 'Goal achieved! Keep it up!' }}
         </p>
       </div>
     </div>

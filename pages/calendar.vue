@@ -6,6 +6,7 @@ definePageMeta({
 })
 
 const { workouts, loadWorkouts } = useWorkoutHistory()
+const { formatVolume } = useUnits()
 
 // Current displayed month
 const currentDate = ref(new Date())
@@ -112,13 +113,6 @@ function formatDuration(seconds: number) {
     return `${hrs}h ${mins % 60}m`
   }
   return `${mins}m`
-}
-
-function formatVolume(kg: number) {
-  if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(1)}k kg`
-  }
-  return `${kg} kg`
 }
 
 // Stats

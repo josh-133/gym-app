@@ -8,6 +8,7 @@ definePageMeta({
 
 const { goals, loading, fetchGoals, createGoal, updateGoalProgress, deleteGoal, activeGoals, completedGoals, getProgressPercentage, getGoalTypeInfo } = useGoals()
 const notification = useNotification()
+const { isImperial, weightUnit, distanceUnit } = useUnits()
 
 // Fetch goals on mount
 onMounted(() => {
@@ -17,8 +18,14 @@ onMounted(() => {
 // Modal state
 const showAddModal = ref(false)
 const showEditModal = ref(false)
+const showDeleteConfirmModal = ref(false)
+const goalToDelete = ref<string | null>(null)
 const saving = ref(false)
 const editingGoalId = ref<string | null>(null)
+
+// Default unit based on user's preference
+const defaultWeightUnit = computed(() => isImperial.value ? 'lbs' : 'kg')
+const defaultDistanceUnit = computed(() => isImperial.value ? 'miles' : 'km')
 
 const newGoal = ref<CreateGoalInput>({
   goal_type: 'strength',
@@ -26,7 +33,7 @@ const newGoal = ref<CreateGoalInput>({
   description: '',
   target_value: 0,
   current_value: 0,
-  unit: 'kg',
+  unit: defaultWeightUnit.value,
   exercise_id: '',
   deadline: '',
 })
@@ -57,7 +64,7 @@ function resetForm() {
     description: '',
     target_value: 0,
     current_value: 0,
-    unit: 'kg',
+    unit: defaultWeightUnit.value,
     exercise_id: '',
     deadline: '',
   }
@@ -113,15 +120,23 @@ async function handleUpdateProgress() {
   }
 }
 
-async function handleDeleteGoal(id: string) {
-  if (!confirm('Are you sure you want to delete this goal?')) return
+function confirmDeleteGoal(id: string) {
+  goalToDelete.value = id
+  showDeleteConfirmModal.value = true
+}
+
+async function handleDeleteGoal() {
+  if (!goalToDelete.value) return
 
   try {
-    await deleteGoal(id)
+    await deleteGoal(goalToDelete.value)
     notification.success('Goal deleted.')
   } catch (err) {
     console.error('Error deleting goal:', err)
     notification.error('Failed to delete goal. Please try again.')
+  } finally {
+    showDeleteConfirmModal.value = false
+    goalToDelete.value = null
   }
 }
 
@@ -206,7 +221,7 @@ function formatDeadline(dateStr?: string) {
                 </button>
                 <button
                   class="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                  @click="handleDeleteGoal(goal.id)"
+                  @click="confirmDeleteGoal(goal.id)"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -320,6 +335,7 @@ function formatDeadline(dateStr?: string) {
           <input
             v-model="newGoal.deadline"
             type="date"
+            :min="new Date().toISOString().split('T')[0]"
             class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
           />
         </NFormItem>
@@ -375,6 +391,28 @@ function formatDeadline(dateStr?: string) {
             @click="handleUpdateProgress"
           >
             Update Progress
+          </NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <!-- Delete Goal Confirmation Modal -->
+    <NModal
+      v-model:show="showDeleteConfirmModal"
+      preset="card"
+      title="Delete Goal"
+      :style="{ maxWidth: '400px' }"
+    >
+      <p class="text-gray-600 dark:text-gray-300">
+        Are you sure you want to delete this goal? This action cannot be undone.
+      </p>
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <NButton @click="showDeleteConfirmModal = false; goalToDelete = null">
+            Cancel
+          </NButton>
+          <NButton type="error" @click="handleDeleteGoal">
+            Delete
           </NButton>
         </div>
       </template>

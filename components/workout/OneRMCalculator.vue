@@ -7,15 +7,36 @@ import {
   TRAINING_PERCENTAGES,
 } from '~/utils/fitness'
 
+const { convertWeight, toMetricWeight, weightUnit, isImperial } = useUnits()
+
 const weight = ref<number | null>(100)
 const reps = ref<number>(5)
+
+// Store weight internally in kg, display in user's unit
+const displayWeight = computed({
+  get: () => convertWeight(weight.value),
+  set: (val: number | null) => {
+    weight.value = toMetricWeight(val)
+  }
+})
 
 const estimated1RM = computed(() => {
   return calculate1RM(weight.value ?? 0, reps.value)
 })
 
+const estimated1RMDisplay = computed(() => convertWeight(estimated1RM.value))
+
 function calculateWeight(percent: number) {
   return calculatePercentageWeight(estimated1RM.value, percent)
+}
+
+function calculateWeightDisplay(percent: number) {
+  return convertWeight(calculateWeight(percent))
+}
+
+function roundToNearestPlateDisplay(kg: number) {
+  const rounded = roundToNearestPlate(kg)
+  return convertWeight(rounded)
 }
 </script>
 
@@ -26,13 +47,13 @@ function calculateWeight(percent: number) {
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Weight (kg)
+            Weight ({{ weightUnit }})
           </label>
           <NInputNumber
-            v-model:value="weight"
+            v-model:value="displayWeight"
             :min="0"
-            :max="500"
-            :step="2.5"
+            :max="isImperial ? 1100 : 500"
+            :step="isImperial ? 5 : 2.5"
             placeholder="Enter weight"
             class="w-full"
           />
@@ -76,15 +97,15 @@ function calculateWeight(percent: number) {
       <!-- Result -->
       <div class="bg-gradient-to-br from-primary-500 via-accent-500 to-secondary-500 rounded-2xl p-6 text-center text-white shadow-lg">
         <p class="text-sm opacity-90 mb-1">Estimated 1 Rep Max</p>
-        <p class="text-5xl font-bold">{{ estimated1RM }}</p>
-        <p class="text-sm opacity-90 mt-1">kg</p>
+        <p class="text-5xl font-bold">{{ estimated1RMDisplay }}</p>
+        <p class="text-sm opacity-90 mt-1">{{ weightUnit }}</p>
       </div>
 
       <!-- Formula Explanation -->
       <div class="text-center text-sm text-gray-500 dark:text-gray-400">
         <p>Using Epley Formula: 1RM = weight &times; (1 + reps/30)</p>
-        <p v-if="weight && reps > 1" class="mt-1">
-          {{ weight }} &times; (1 + {{ reps }}/30) = {{ estimated1RM }} kg
+        <p v-if="displayWeight && reps > 1" class="mt-1">
+          {{ displayWeight }} &times; (1 + {{ reps }}/30) = {{ estimated1RMDisplay }} {{ weightUnit }}
         </p>
       </div>
 
@@ -112,16 +133,16 @@ function calculateWeight(percent: number) {
                 class="font-semibold"
                 :class="p.percent === 100 ? 'text-primary-700 dark:text-primary-300' : 'text-gray-900 dark:text-white'"
               >
-                {{ calculateWeight(p.percent) }} kg
+                {{ calculateWeightDisplay(p.percent) }} {{ weightUnit }}
               </span>
               <span class="text-xs text-gray-400 dark:text-gray-500">
-                ({{ roundToNearestPlate(calculateWeight(p.percent)) }})
+                ({{ roundToNearestPlateDisplay(calculateWeight(p.percent)) }})
               </span>
             </div>
           </div>
         </div>
         <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
-          Numbers in parentheses rounded to nearest 2.5kg
+          Numbers in parentheses rounded to nearest {{ isImperial ? '5lbs' : '2.5kg' }}
         </p>
       </div>
     </div>

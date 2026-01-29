@@ -8,6 +8,7 @@ definePageMeta({
 
 // Get saved workouts from localStorage
 const { workouts: savedWorkouts, loadWorkouts } = useWorkoutHistory()
+const { formatVolume } = useUnits()
 const { templates: savedTemplates, loadTemplates, addTemplate, updateTemplate, deleteTemplate } = useTemplates()
 
 // Modal state
@@ -17,6 +18,10 @@ const templateName = ref('')
 const templateExercises = ref<{ name: string; sets: number; defaultReps?: number }[]>([])
 const showExercisePicker = ref(false)
 const exerciseSearch = ref('')
+
+// Delete confirmation modal state
+const showDeleteConfirmModal = ref(false)
+const templateToDelete = ref<string | null>(null)
 
 // Load on mount
 onMounted(() => {
@@ -133,8 +138,15 @@ function saveTemplate() {
 }
 
 function confirmDeleteTemplate(id: string) {
-  if (confirm('Are you sure you want to delete this template?')) {
-    deleteTemplate(id)
+  templateToDelete.value = id
+  showDeleteConfirmModal.value = true
+}
+
+function handleDeleteTemplate() {
+  if (templateToDelete.value) {
+    deleteTemplate(templateToDelete.value)
+    showDeleteConfirmModal.value = false
+    templateToDelete.value = null
   }
 }
 
@@ -149,13 +161,6 @@ function formatDuration(minutes: number) {
     return `${hrs}h ${mins}m`
   }
   return `${mins}m`
-}
-
-function formatVolume(kg: number) {
-  if (kg >= 1000) {
-    return `${(kg / 1000).toFixed(1)}k kg`
-  }
-  return `${kg} kg`
 }
 
 function formatDate(dateStr: string) {
@@ -442,6 +447,28 @@ function getRatingStars(rating: number) {
           </div>
         </button>
       </div>
+    </NModal>
+
+    <!-- Delete Template Confirmation Modal -->
+    <NModal
+      v-model:show="showDeleteConfirmModal"
+      preset="card"
+      title="Delete Template"
+      style="width: 90%; max-width: 400px;"
+    >
+      <p class="text-gray-600 dark:text-gray-300">
+        Are you sure you want to delete this template? This action cannot be undone.
+      </p>
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" @click="showDeleteConfirmModal = false; templateToDelete = null">
+            Cancel
+          </NButton>
+          <NButton type="error" class="flex-1" @click="handleDeleteTemplate">
+            Delete
+          </NButton>
+        </div>
+      </template>
     </NModal>
   </div>
 </template>
