@@ -30,8 +30,16 @@ export type Equipment =
   | 'resistance_band'
   | 'bench'
   | 'pull_up_bar'
+  | 'treadmill'
+  | 'bike'
+  | 'rower'
+  | 'elliptical'
+  | 'jump_rope'
+  | 'box'
 
 export type ExerciseCategory = 'strength' | 'cardio' | 'flexibility' | 'warmup'
+
+export type CardioTrackingType = 'duration' | 'duration_distance' | 'reps'
 
 export interface ExerciseDefinition {
   id: string
@@ -42,6 +50,7 @@ export interface ExerciseDefinition {
   isCompound: boolean
   difficulty: 'beginner' | 'intermediate' | 'advanced'
   instructions?: string
+  trackingType?: CardioTrackingType // For cardio: how to track this exercise
 }
 
 export const EXERCISE_LIBRARY: ExerciseDefinition[] = [
@@ -756,6 +765,274 @@ export const EXERCISE_LIBRARY: ExerciseDefinition[] = [
     equipment: ['bodyweight'],
     isCompound: true,
     difficulty: 'beginner',
+  },
+
+  // CARDIO - RUNNING
+  {
+    id: 'treadmill-run',
+    name: 'Treadmill Run',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['treadmill'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'outdoor-run',
+    name: 'Outdoor Run',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'treadmill-walk',
+    name: 'Treadmill Walk',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['treadmill'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'outdoor-walk',
+    name: 'Outdoor Walk',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'incline-walk',
+    name: 'Incline Walk',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['treadmill'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'sprints',
+    name: 'Sprints',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'duration_distance',
+  },
+
+  // CARDIO - CYCLING
+  {
+    id: 'stationary-bike',
+    name: 'Stationary Bike',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['bike'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'outdoor-cycling',
+    name: 'Outdoor Cycling',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['bike'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'spin-class',
+    name: 'Spin Class',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'calves', 'glutes'],
+    equipment: ['bike'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'duration',
+  },
+
+  // CARDIO - OTHER MACHINES
+  {
+    id: 'rowing-machine',
+    name: 'Rowing Machine',
+    category: 'cardio',
+    muscleGroups: ['back', 'lats', 'quads', 'hamstrings', 'glutes', 'biceps'],
+    equipment: ['rower'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'elliptical',
+    name: 'Elliptical',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'glutes', 'calves'],
+    equipment: ['elliptical'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration_distance',
+  },
+  {
+    id: 'stair-climber',
+    name: 'Stair Climber',
+    category: 'cardio',
+    muscleGroups: ['quads', 'hamstrings', 'glutes', 'calves'],
+    equipment: ['machine'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'duration',
+  },
+
+  // CARDIO - JUMP ROPE & OTHER
+  {
+    id: 'jump-rope',
+    name: 'Jump Rope',
+    category: 'cardio',
+    muscleGroups: ['calves', 'quads', 'shoulders'],
+    equipment: ['jump_rope'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'duration',
+  },
+  {
+    id: 'battle-ropes',
+    name: 'Battle Ropes',
+    category: 'cardio',
+    muscleGroups: ['shoulders', 'back', 'abs', 'biceps'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'duration',
+  },
+  {
+    id: 'swimming',
+    name: 'Swimming',
+    category: 'cardio',
+    muscleGroups: ['back', 'shoulders', 'lats', 'abs'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'duration_distance',
+  },
+
+  // PLYOMETRIC / EXPLOSIVE EXERCISES
+  {
+    id: 'box-jumps',
+    name: 'Box Jumps',
+    category: 'cardio',
+    muscleGroups: ['quads', 'glutes', 'calves', 'hamstrings'],
+    equipment: ['box'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'reps',
+  },
+  {
+    id: 'squat-jumps',
+    name: 'Squat Jumps',
+    category: 'cardio',
+    muscleGroups: ['quads', 'glutes', 'calves', 'hamstrings'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'reps',
+  },
+  {
+    id: 'burpees',
+    name: 'Burpees',
+    category: 'cardio',
+    muscleGroups: ['quads', 'chest', 'shoulders', 'abs'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'reps',
+  },
+  {
+    id: 'jump-lunges',
+    name: 'Jump Lunges',
+    category: 'cardio',
+    muscleGroups: ['quads', 'glutes', 'hamstrings', 'calves'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'reps',
+  },
+  {
+    id: 'tuck-jumps',
+    name: 'Tuck Jumps',
+    category: 'cardio',
+    muscleGroups: ['quads', 'glutes', 'calves', 'abs'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'reps',
+  },
+  {
+    id: 'broad-jumps',
+    name: 'Broad Jumps',
+    category: 'cardio',
+    muscleGroups: ['quads', 'glutes', 'hamstrings', 'calves'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'intermediate',
+    trackingType: 'reps',
+  },
+  {
+    id: 'skater-jumps',
+    name: 'Skater Jumps',
+    category: 'cardio',
+    muscleGroups: ['quads', 'glutes', 'hamstrings', 'calves'],
+    equipment: ['bodyweight'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'reps',
+  },
+  {
+    id: 'power-cleans',
+    name: 'Power Cleans',
+    category: 'strength',
+    muscleGroups: ['quads', 'glutes', 'hamstrings', 'traps', 'shoulders'],
+    equipment: ['barbell'],
+    isCompound: true,
+    difficulty: 'advanced',
+  },
+  {
+    id: 'kettlebell-swings',
+    name: 'Kettlebell Swings',
+    category: 'cardio',
+    muscleGroups: ['glutes', 'hamstrings', 'back', 'shoulders'],
+    equipment: ['kettlebell'],
+    isCompound: true,
+    difficulty: 'beginner',
+    trackingType: 'reps',
+  },
+  {
+    id: 'step-ups',
+    name: 'Step-Ups',
+    category: 'strength',
+    muscleGroups: ['quads', 'glutes', 'hamstrings'],
+    equipment: ['box', 'bodyweight'],
+    isCompound: true,
+    difficulty: 'beginner',
+  },
+  {
+    id: 'depth-jumps',
+    name: 'Depth Jumps',
+    category: 'cardio',
+    muscleGroups: ['quads', 'glutes', 'calves'],
+    equipment: ['box'],
+    isCompound: true,
+    difficulty: 'advanced',
+    trackingType: 'reps',
   },
 ]
 

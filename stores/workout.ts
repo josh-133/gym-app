@@ -197,9 +197,24 @@ export const useWorkoutStore = defineStore('workout', {
 
     updateCardioLog(exerciseIndex: number, data: Partial<CardioLog>) {
       const log = this.exerciseLogs[exerciseIndex]
-      if (!log || !log.cardio_log) return
+      if (!log) return
+
+      // Initialize cardio_log if it doesn't exist
+      if (!log.cardio_log) {
+        log.cardio_log = {}
+      }
 
       log.cardio_log = { ...log.cardio_log, ...data }
+    },
+
+    completeCardioLog(exerciseIndex: number) {
+      const log = this.exerciseLogs[exerciseIndex]
+      if (!log || !log.cardio_log) return
+
+      log.cardio_log = {
+        ...log.cardio_log,
+        completed_at: new Date().toISOString(),
+      }
     },
 
     startRestTimer(seconds: number) {

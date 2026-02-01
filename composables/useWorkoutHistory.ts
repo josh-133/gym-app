@@ -1,3 +1,10 @@
+interface CardioData {
+  duration_sec: number
+  distance_km?: number
+  calories?: number
+  completed: boolean
+}
+
 interface SavedWorkout {
   id: string
   name: string
@@ -5,11 +12,13 @@ interface SavedWorkout {
   duration: number // in seconds
   exercises: {
     name: string
+    category?: 'strength' | 'cardio' | 'flexibility' | 'sport'
     sets: {
       weight: number | null
       reps: number | null
       completed: boolean
     }[]
+    cardio?: CardioData
   }[]
   volume: number
   rating: number | null
@@ -442,6 +451,115 @@ export function useWorkoutHistory() {
     }
   }
 
+  // Get cardio exercise history
+  function getCardioHistory(exerciseName: string): {
+    date: string
+    workoutId: string
+    workoutName: string
+    duration_sec: number
+    distance_km?: number
+    calories?: number
+    pace_sec_per_km?: number
+  }[] {
+    const history: ReturnType<typeof getCardioHistory> = []
+
+    for (const workout of workouts.value) {
+      const exercise = workout.exercises.find(e => e.name === exerciseName)
+      if (exercise?.cardio && exercise.cardio.completed) {
+        const cardio = exercise.cardio
+        history.push({
+          date: workout.date,
+          workoutId: workout.id,
+          workoutName: workout.name,
+          duration_sec: cardio.duration_sec,
+          distance_km: cardio.distance_km,
+          calories: cardio.calories,
+          pace_sec_per_km: cardio.distance_km
+            ? Math.round(cardio.duration_sec / cardio.distance_km)
+            : undefined,
+        })
+      }
+    }
+
+    return history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }
+
+  // Get cardio totals for a given period (defaults to last 7 days)
+  function getCardioTotals(days: number = 7): {
+    totalDuration: number
+    totalDistance: number
+    totalCalories: number
+    sessionCount: number
+  } {
+    const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000)
+
+    let totalDuration = 0
+    let totalDistance = 0
+    let totalCalories = 0
+    let sessionCount = 0
+
+    workouts.value.forEach(workout => {
+      if (new Date(workout.date).getTime() < cutoff) return
+
+      workout.exercises.forEach(exercise => {
+        if (exercise.cardio && exercise.cardio.completed) {
+          totalDuration += exercise.cardio.duration_sec
+          totalDistance += exercise.cardio.distance_km || 0
+          totalCalories += exercise.cardio.calories || 0
+          sessionCount++
+        }
+      })
+    })
+
+    return { totalDuration, totalDistance, totalCalories, sessionCount }
+  }
+
+  // Get cardio personal bests
+  function getCardioPRs(): {
+    exercise: string
+    bestDistance?: { value: number; date: string }
+    bestDuration?: { value: number; date: string }
+    bestPace?: { value: number; date: string }
+  }[] {
+    const prMap = new Map<string, {
+      exercise: string
+      bestDistance?: { value: number; date: string }
+      bestDuration?: { value: number; date: string }
+      bestPace?: { value: number; date: string }
+    }>()
+
+    workouts.value.forEach(workout => {
+      workout.exercises.forEach(exercise => {
+        if (!exercise.cardio || !exercise.cardio.completed) return
+
+        const cardio = exercise.cardio
+        const existing = prMap.get(exercise.name) || { exercise: exercise.name }
+
+        // Best distance
+        if (cardio.distance_km) {
+          if (!existing.bestDistance || cardio.distance_km > existing.bestDistance.value) {
+            existing.bestDistance = { value: cardio.distance_km, date: workout.date }
+          }
+
+          // Best pace (lowest is better)
+          const pace = cardio.duration_sec / cardio.distance_km
+          if (!existing.bestPace || pace < existing.bestPace.value) {
+            existing.bestPace = { value: pace, date: workout.date }
+          }
+        }
+
+        // Best duration (longest)
+        if (!existing.bestDuration || cardio.duration_sec > existing.bestDuration.value) {
+          existing.bestDuration = { value: cardio.duration_sec, date: workout.date }
+        }
+
+        prMap.set(exercise.name, existing)
+      })
+    })
+
+    return Array.from(prMap.values())
+  }
+
   // Initialize on mount
   onMounted(() => {
     loadWorkouts()
@@ -475,5 +593,9 @@ export function useWorkoutHistory() {
     weeklyGoalTarget: readonly(weeklyGoalTarget),
     setWeeklyGoalTarget,
     loadWeeklyGoal,
+    // Cardio functions
+    getCardioHistory,
+    getCardioTotals,
+    getCardioPRs,
   }
 }

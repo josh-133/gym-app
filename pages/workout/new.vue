@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane, NDatePicker, NInputNumber, NSwitch } from 'naive-ui'
+import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane, NDatePicker, NInputNumber, NSwitch, NTag } from 'naive-ui'
 import type { Exercise } from '~/types/database'
 import RestTimer from '~/components/workout/RestTimer.vue'
-import { EXERCISE_LIBRARY } from '~/utils/exercises'
+import CardioInput from '~/components/workout/CardioInput.vue'
+import { EXERCISE_LIBRARY, type CardioTrackingType } from '~/utils/exercises'
 
 definePageMeta({
   middleware: ['auth'],
@@ -58,7 +59,7 @@ function getMuscleGroupDescription(exercises: readonly { readonly name: string }
 }
 
 // Helper to convert template exercise to full Exercise type
-function convertToExercise(ex: { readonly name: string; readonly sets: number; readonly defaultReps?: number }): Exercise {
+function convertToExercise(ex: { readonly name: string; readonly sets: number; readonly defaultReps?: number }): Exercise & { trackingType?: CardioTrackingType } {
   const libraryEx = EXERCISE_LIBRARY.find(e => e.name === ex.name)
   return {
     id: libraryEx?.id || ex.name,
@@ -75,11 +76,15 @@ function convertToExercise(ex: { readonly name: string; readonly sets: number; r
     video_url: null,
     image_url: null,
     created_at: '',
+    trackingType: libraryEx?.trackingType,
   }
 }
 
+// Extended Exercise type with tracking info
+type ExerciseWithTracking = Exercise & { trackingType?: CardioTrackingType }
+
 // Convert EXERCISE_LIBRARY to Exercise format for the picker
-const exercises = computed<Exercise[]>(() => {
+const exercises = computed<ExerciseWithTracking[]>(() => {
   return EXERCISE_LIBRARY
     .filter(ex => ex.category !== 'warmup')
     .map(ex => ({
@@ -97,8 +102,31 @@ const exercises = computed<Exercise[]>(() => {
       video_url: null,
       image_url: null,
       created_at: '',
+      trackingType: ex.trackingType,
     }))
 })
+
+// Group exercises by category for the picker
+const exercisesByCategory = computed(() => {
+  const grouped = {
+    strength: [] as ExerciseWithTracking[],
+    cardio: [] as ExerciseWithTracking[],
+  }
+  exercises.value.forEach(ex => {
+    if (ex.category === 'cardio') {
+      grouped.cardio.push(ex)
+    } else {
+      grouped.strength.push(ex)
+    }
+  })
+  return grouped
+})
+
+// Get tracking type for an exercise
+function getExerciseTrackingType(exerciseName: string): CardioTrackingType | undefined {
+  const libraryEx = EXERCISE_LIBRARY.find(e => e.name === exerciseName)
+  return libraryEx?.trackingType
+}
 
 const exerciseSearch = ref('')
 const filteredExercises = computed(() => {
@@ -130,10 +158,28 @@ function startFromTemplate(template: typeof templates.value[0]) {
   })
 }
 
-function addExercise(exercise: Exercise) {
+function addExercise(exercise: ExerciseWithTracking) {
   workoutStore.addExercise(exercise)
+  // Only add default sets for strength exercises, not cardio
+  if (exercise.category !== 'cardio') {
+    const exerciseIndex = workoutStore.exerciseLogs.length - 1
+    workoutStore.addSet(exerciseIndex)
+  }
   showExercisePicker.value = false
   exerciseSearch.value = ''
+}
+
+// Handle cardio log updates
+function handleCardioUpdate(exerciseIndex: number, data: { duration_sec: number | null; distance_km: number | null; calories: number | null }) {
+  workoutStore.updateCardioLog(exerciseIndex, {
+    duration_sec: data.duration_sec || 0,
+    distance_km: data.distance_km || undefined,
+    calories_burned: data.calories || undefined,
+  })
+}
+
+function handleCardioComplete(exerciseIndex: number) {
+  workoutStore.completeCardioLog(exerciseIndex)
 }
 
 function removeExercise(index: number) {
@@ -164,8 +210,9 @@ function finishWorkout() {
 async function confirmFinishWorkout() {
   const result = await workoutStore.endWorkout()
   if (result) {
-    // Calculate total volume
+    // Calculate total volume (only for strength exercises)
     const volume = result.exerciseLogs.reduce((sum, log) => {
+      if (log.exercise.category === 'cardio') return sum
       return sum + log.sets.reduce((setSum, set) => {
         if (set.completed_at && set.reps && set.weight_kg) {
           return setSum + (set.reps * set.weight_kg)
@@ -190,11 +237,18 @@ async function confirmFinishWorkout() {
       duration,
       exercises: result.exerciseLogs.map(log => ({
         name: log.exercise.name,
+        category: log.exercise.category,
         sets: log.sets.map(set => ({
           weight: set.weight_kg,
           reps: set.reps,
           completed: !!set.completed_at,
         })),
+        cardio: log.cardio_log ? {
+          duration_sec: log.cardio_log.duration_sec || 0,
+          distance_km: log.cardio_log.distance_km || undefined,
+          calories: log.cardio_log.calories_burned || undefined,
+          completed: !!log.cardio_log.completed_at,
+        } : undefined,
       })),
       volume,
       rating: null,
@@ -455,8 +509,30 @@ onMounted(() => {
               </div>
             </template>
 
-            <!-- Sets -->
-            <div class="space-y-2">
+            <!-- Cardio Input -->
+            <div v-if="log.exercise.category === 'cardio'" class="space-y-2">
+              <CardioInput
+                :exercise-index="index"
+                :tracking-type="getExerciseTrackingType(log.exercise.name) || 'duration'"
+                :cardio-log="{
+                  duration_sec: log.cardio_log?.duration_sec || null,
+                  distance_km: log.cardio_log?.distance_km || null,
+                  calories: log.cardio_log?.calories_burned || null,
+                }"
+                @update="(data) => handleCardioUpdate(index, data)"
+                @complete="handleCardioComplete(index)"
+                @remove="removeExercise(index)"
+              />
+              <div v-if="log.cardio_log?.completed_at" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span class="text-sm text-green-700 dark:text-green-300">Completed</span>
+              </div>
+            </div>
+
+            <!-- Strength Sets -->
+            <div v-else class="space-y-2">
               <!-- Set Headers -->
               <div class="grid grid-cols-12 gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 px-2">
                 <div class="col-span-1">Set</div>
@@ -541,21 +617,47 @@ onMounted(() => {
         </template>
       </NInput>
 
-      <div class="space-y-2 max-h-96 overflow-y-auto">
-        <button
-          v-for="exercise in filteredExercises"
-          :key="exercise.id"
-          class="w-full text-left p-3 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:shadow-md transition-all"
-          @click="addExercise(exercise)"
-        >
-          <div class="font-medium text-gray-900 dark:text-white">
-            {{ exercise.name }}
+      <NTabs type="line" animated default-value="strength">
+        <NTabPane name="strength" tab="Strength">
+          <div class="space-y-2 max-h-80 overflow-y-auto mt-2">
+            <button
+              v-for="exercise in filteredExercises.filter(e => e.category !== 'cardio')"
+              :key="exercise.id"
+              class="w-full text-left p-3 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:shadow-md transition-all"
+              @click="addExercise(exercise)"
+            >
+              <div class="font-medium text-gray-900 dark:text-white">
+                {{ exercise.name }}
+              </div>
+              <div class="text-sm text-gray-500 dark:text-gray-400">
+                {{ formatMuscleGroups(exercise.muscle_groups) }}
+              </div>
+            </button>
           </div>
-          <div class="text-sm text-gray-500 dark:text-gray-400">
-            {{ formatMuscleGroups(exercise.muscle_groups) }}
+        </NTabPane>
+        <NTabPane name="cardio" tab="Cardio">
+          <div class="space-y-2 max-h-80 overflow-y-auto mt-2">
+            <button
+              v-for="exercise in filteredExercises.filter(e => e.category === 'cardio')"
+              :key="exercise.id"
+              class="w-full text-left p-3 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:shadow-md transition-all"
+              @click="addExercise(exercise)"
+            >
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-gray-900 dark:text-white">
+                  {{ exercise.name }}
+                </span>
+                <NTag v-if="exercise.trackingType === 'reps'" size="tiny" type="info">Reps</NTag>
+                <NTag v-else-if="exercise.trackingType === 'duration_distance'" size="tiny" type="success">Distance</NTag>
+                <NTag v-else size="tiny" type="warning">Time</NTag>
+              </div>
+              <div class="text-sm text-gray-500 dark:text-gray-400">
+                {{ formatMuscleGroups(exercise.muscle_groups) }}
+              </div>
+            </button>
           </div>
-        </button>
-      </div>
+        </NTabPane>
+      </NTabs>
     </NModal>
 
     <!-- Finish Workout Modal -->
