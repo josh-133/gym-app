@@ -95,7 +95,7 @@ function emitUpdate() {
     emit('update', {
       duration_sec: reps.value,
       distance_km: null,
-      calories: calories.value,
+      calories: null,
     })
   } else {
     emit('update', {
@@ -121,24 +121,14 @@ const distanceLabel = computed(() => unitSystem.value === 'imperial' ? 'Distance
   <div class="cardio-input">
     <!-- Reps-based tracking (box jumps, burpees, etc.) -->
     <div v-if="trackingType === 'reps'" class="reps-input">
-      <div class="input-row">
-        <div class="input-group">
+      <div class="input-row single">
+        <div class="input-group reps-only">
           <label>Reps</label>
           <NInputNumber
             v-model:value="reps"
             :min="0"
             :max="999"
             placeholder="0"
-            size="large"
-          />
-        </div>
-        <div class="input-group">
-          <label>Calories</label>
-          <NInputNumber
-            v-model:value="calories"
-            :min="0"
-            :max="9999"
-            placeholder="—"
             size="large"
           />
         </div>
@@ -296,7 +286,21 @@ const distanceLabel = computed(() => unitSystem.value === 'imperial' ? 'Distance
 }
 
 .input-group.time {
-  flex: 0 0 70px;
+  flex: 0 0 80px;
+  min-width: 80px;
+}
+
+.input-group.reps-only {
+  max-width: 120px;
+}
+
+:deep(.n-input-number) {
+  width: 100%;
+}
+
+:deep(.n-input-number .n-input__input-el) {
+  text-align: center;
+  font-size: 16px;
 }
 
 .input-group label {
