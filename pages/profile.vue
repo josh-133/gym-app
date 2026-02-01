@@ -12,6 +12,16 @@ const route = useRoute()
 const router = useRouter()
 const { isPremium, status, openCustomerPortal } = useSubscription()
 const notification = useNotification()
+const { workouts, loadWorkouts } = useWorkoutHistory()
+const { measurements, fetchMeasurements } = useBodyMeasurements()
+const { goals, fetchGoals } = useGoals()
+
+// Load data for export
+onMounted(() => {
+  loadWorkouts()
+  fetchMeasurements()
+  fetchGoals()
+})
 
 // Tab state - read from query parameter
 const activeTab = ref<string>('profile')
@@ -168,6 +178,47 @@ async function handleSignOut() {
   // Always navigate to login, even if signOut fails
   await navigateTo('/login')
 }
+
+// Export all user data as JSON
+const isExporting = ref(false)
+
+async function exportData() {
+  isExporting.value = true
+  try {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      profile: auth.profile.value ? {
+        username: auth.profile.value.username,
+        displayName: auth.profile.value.display_name,
+        bio: auth.profile.value.bio,
+        fitnessGoal: auth.profile.value.fitness_goal,
+        experienceLevel: auth.profile.value.experience_level,
+        unitSystem: auth.profile.value.unit_system,
+        createdAt: auth.profile.value.created_at,
+      } : null,
+      workouts: workouts.value,
+      bodyMeasurements: measurements.value,
+      goals: goals.value,
+    }
+
+    const dataStr = JSON.stringify(exportData, null, 2)
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr)
+
+    const exportFileName = `gym-tracker-export-${new Date().toISOString().split('T')[0]}.json`
+
+    const linkElement = document.createElement('a')
+    linkElement.setAttribute('href', dataUri)
+    linkElement.setAttribute('download', exportFileName)
+    linkElement.click()
+
+    notification.success('Data exported successfully!')
+  } catch (error) {
+    console.error('Export error:', error)
+    notification.error('Failed to export data. Please try again.')
+  } finally {
+    isExporting.value = false
+  }
+}
 </script>
 
 <template>
@@ -308,6 +359,26 @@ async function handleSignOut() {
               </div>
               <NButton @click="uiStore.toggleTheme">
                 Toggle Theme
+              </NButton>
+            </div>
+          </NCard>
+
+          <!-- Data Export -->
+          <NCard title="Your Data">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-medium text-gray-900 dark:text-white">Export Data</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  Download all your workout history, measurements, and goals as JSON
+                </p>
+              </div>
+              <NButton :loading="isExporting" @click="exportData">
+                <template #icon>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </template>
+                Export
               </NButton>
             </div>
           </NCard>

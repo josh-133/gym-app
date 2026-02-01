@@ -11,10 +11,12 @@ const exerciseId = route.params.id as string
 
 const { customExercisesAsDefinitions, fetchCustomExercises } = useCustomExercises()
 const { convertWeight, weightUnit } = useUnits()
+const { getExerciseHistory, getExercisePR, loadWorkouts } = useWorkoutHistory()
 
-// Fetch custom exercises on mount
+// Fetch custom exercises and workout history on mount
 onMounted(() => {
   fetchCustomExercises()
+  loadWorkouts()
 })
 
 // Find exercise from the library or custom exercises
@@ -33,11 +35,31 @@ const exercise = computed<ExerciseDefinition | null>(() => {
 // Check if this is a custom exercise
 const isCustom = computed(() => exerciseId.includes('-') && exerciseId.length > 20)
 
-// Empty history - would come from user's workout data in a real app
-const history = ref<{ date: string; sets: number; bestWeight: number; bestReps: number; volume: number }[]>([])
+// Get exercise history from workout data
+const history = computed(() => {
+  if (!exercise.value) return []
+  const rawHistory = getExerciseHistory(exercise.value.name)
+  return rawHistory.map(h => ({
+    date: h.date,
+    workoutName: h.workoutName,
+    sets: h.sets.filter(s => s.completed).length,
+    bestWeight: h.bestSet?.weight || 0,
+    bestReps: h.bestSet?.reps || 0,
+    volume: h.totalVolume,
+  }))
+})
 
-// No personal record until user logs workouts
-const personalRecord = ref<{ weight: number; reps: number; date: string } | null>(null)
+// Get personal record from workout history
+const personalRecord = computed(() => {
+  if (!exercise.value) return null
+  const pr = getExercisePR(exercise.value.name)
+  if (!pr) return null
+  return {
+    weight: pr.weight,
+    reps: pr.reps,
+    date: pr.date,
+  }
+})
 
 const loading = ref(false)
 const notFound = computed(() => !exercise.value)
@@ -179,18 +201,21 @@ function getDifficultyColor(difficulty: string) {
         <!-- History Tab -->
         <NTabPane name="history" tab="History">
           <div class="space-y-3 mt-4">
-            <NCard v-for="session in history" :key="session.date">
+            <NCard v-for="(session, idx) in history" :key="idx">
               <div class="flex items-center justify-between">
                 <div>
                   <p class="font-medium text-gray-900 dark:text-white">{{ formatDate(session.date) }}</p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ session.sets }} sets</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ session.workoutName }} · {{ session.sets }} sets</p>
                 </div>
                 <div class="text-right">
-                  <p class="font-semibold text-gray-900 dark:text-white">
+                  <p v-if="session.bestWeight > 0" class="font-semibold text-gray-900 dark:text-white">
                     {{ convertWeight(session.bestWeight) }}{{ weightUnit }} × {{ session.bestReps }}
                   </p>
+                  <p v-else class="font-semibold text-gray-900 dark:text-white">
+                    BW × {{ session.bestReps }}
+                  </p>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ convertWeight(session.volume) }}{{ weightUnit }} volume
+                    {{ Math.round(convertWeight(session.volume) || 0) }}{{ weightUnit }} volume
                   </p>
                 </div>
               </div>

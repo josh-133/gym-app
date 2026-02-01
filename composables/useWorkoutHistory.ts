@@ -169,6 +169,68 @@ export function useWorkoutHistory() {
     return allPRs.find(pr => pr.exercise === exerciseName) || null
   }
 
+  // Get the last performed sets for an exercise (from the most recent workout containing it)
+  function getLastPerformedSets(exerciseName: string): { weight: number | null; reps: number | null }[] {
+    // Find the most recent workout containing this exercise
+    for (const workout of workouts.value) {
+      const exercise = workout.exercises.find(e => e.name === exerciseName)
+      if (exercise && exercise.sets.length > 0) {
+        // Return only completed sets with valid data
+        return exercise.sets
+          .filter(s => s.completed && (s.reps !== null || s.weight !== null))
+          .map(s => ({
+            weight: s.weight,
+            reps: s.reps,
+          }))
+      }
+    }
+    return []
+  }
+
+  // Get exercise history (all occurrences of an exercise across workouts)
+  function getExerciseHistory(exerciseName: string): {
+    date: string
+    workoutId: string
+    workoutName: string
+    sets: { weight: number | null; reps: number | null; completed: boolean }[]
+    totalVolume: number
+    bestSet: { weight: number; reps: number } | null
+  }[] {
+    const history: ReturnType<typeof getExerciseHistory> = []
+
+    for (const workout of workouts.value) {
+      const exercise = workout.exercises.find(e => e.name === exerciseName)
+      if (exercise) {
+        const completedSets = exercise.sets.filter(s => s.completed && s.weight && s.reps)
+        const totalVolume = completedSets.reduce((sum, s) => sum + ((s.weight || 0) * (s.reps || 0)), 0)
+
+        // Find best set (highest weight × reps)
+        let bestSet: { weight: number; reps: number } | null = null
+        let bestScore = 0
+        for (const set of completedSets) {
+          if (set.weight && set.reps) {
+            const score = set.weight * set.reps
+            if (score > bestScore) {
+              bestScore = score
+              bestSet = { weight: set.weight, reps: set.reps }
+            }
+          }
+        }
+
+        history.push({
+          date: workout.date,
+          workoutId: workout.id,
+          workoutName: workout.name,
+          sets: exercise.sets,
+          totalVolume,
+          bestSet,
+        })
+      }
+    }
+
+    return history
+  }
+
   // Calculate current day streak (consecutive days with workouts)
   function calculateDayStreak(): number {
     if (workouts.value.length === 0) return 0
@@ -223,6 +285,163 @@ export function useWorkoutHistory() {
     return streak
   }
 
+  // Get exercises that haven't progressed in the last N weeks
+  function getStagnantExercises(weeksThreshold: number = 2): {
+    exercise: string
+    lastPR: { weight: number; reps: number; date: string } | null
+    daysSinceProgress: number
+    timesPerformed: number
+  }[] {
+    const allPRs = calculateAllPRs()
+    const stagnantExercises: ReturnType<typeof getStagnantExercises> = []
+    const thresholdMs = weeksThreshold * 7 * 24 * 60 * 60 * 1000
+    const now = Date.now()
+
+    // Get all unique exercises performed
+    const exerciseSet = new Set<string>()
+    workouts.value.forEach(w => {
+      w.exercises.forEach(e => exerciseSet.add(e.name))
+    })
+
+    for (const exerciseName of exerciseSet) {
+      const history = getExerciseHistory(exerciseName)
+
+      // Only consider exercises performed at least 3 times
+      if (history.length < 3) continue
+
+      const pr = allPRs.find(p => p.exercise === exerciseName)
+      if (!pr) continue
+
+      const prDate = new Date(pr.date).getTime()
+      const daysSinceProgress = Math.floor((now - prDate) / (24 * 60 * 60 * 1000))
+
+      // Check if PR is older than threshold
+      if ((now - prDate) > thresholdMs) {
+        // Check if they've done this exercise recently (within threshold)
+        const recentPerformance = history.find(h => {
+          const performedDate = new Date(h.date).getTime()
+          return (now - performedDate) < thresholdMs
+        })
+
+        // Only flag if they're still doing the exercise but not progressing
+        if (recentPerformance) {
+          stagnantExercises.push({
+            exercise: exerciseName,
+            lastPR: {
+              weight: pr.weight,
+              reps: pr.reps,
+              date: pr.date,
+            },
+            daysSinceProgress,
+            timesPerformed: history.length,
+          })
+        }
+      }
+    }
+
+    // Sort by days since progress (longest first)
+    return stagnantExercises.sort((a, b) => b.daysSinceProgress - a.daysSinceProgress)
+  }
+
+  // Get all workout dates for calendar visualization
+  function getWorkoutDates(): { date: string; count: number }[] {
+    const dateMap = new Map<string, number>()
+
+    workouts.value.forEach(w => {
+      const dateStr = new Date(w.date).toISOString().split('T')[0]
+      dateMap.set(dateStr, (dateMap.get(dateStr) || 0) + 1)
+    })
+
+    return Array.from(dateMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  // Analyze training load and recommend deload if needed
+  function getDeloadRecommendation(): {
+    shouldDeload: boolean
+    reason: string
+    weeksOfTraining: number
+    avgWorkoutsPerWeek: number
+    totalVolumeTrend: 'increasing' | 'stable' | 'decreasing'
+  } | null {
+    if (workouts.value.length < 8) {
+      return null // Not enough data
+    }
+
+    const now = Date.now()
+    const fourWeeksAgo = now - (4 * 7 * 24 * 60 * 60 * 1000)
+    const eightWeeksAgo = now - (8 * 7 * 24 * 60 * 60 * 1000)
+
+    // Get workouts from the last 4 weeks and the 4 weeks before that
+    const recentWorkouts = workouts.value.filter(w => new Date(w.date).getTime() >= fourWeeksAgo)
+    const previousWorkouts = workouts.value.filter(w => {
+      const date = new Date(w.date).getTime()
+      return date >= eightWeeksAgo && date < fourWeeksAgo
+    })
+
+    if (recentWorkouts.length < 4 || previousWorkouts.length < 4) {
+      return null // Not enough consistent training
+    }
+
+    // Calculate metrics
+    const recentVolume = recentWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0)
+    const previousVolume = previousWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0)
+    const volumeChange = previousVolume > 0 ? ((recentVolume - previousVolume) / previousVolume) * 100 : 0
+
+    const weeksOfTraining = Math.ceil((now - new Date(workouts.value[workouts.value.length - 1].date).getTime()) / (7 * 24 * 60 * 60 * 1000))
+    const avgWorkoutsPerWeek = workouts.value.length / Math.max(weeksOfTraining, 1)
+
+    // Determine volume trend
+    let totalVolumeTrend: 'increasing' | 'stable' | 'decreasing' = 'stable'
+    if (volumeChange > 10) totalVolumeTrend = 'increasing'
+    else if (volumeChange < -10) totalVolumeTrend = 'decreasing'
+
+    // Count consecutive weeks with 4+ workouts
+    let consecutiveHighVolumeWeeks = 0
+    for (let i = 0; i < 8; i++) {
+      const weekStart = now - ((i + 1) * 7 * 24 * 60 * 60 * 1000)
+      const weekEnd = now - (i * 7 * 24 * 60 * 60 * 1000)
+      const weekWorkouts = workouts.value.filter(w => {
+        const date = new Date(w.date).getTime()
+        return date >= weekStart && date < weekEnd
+      })
+      if (weekWorkouts.length >= 4) {
+        consecutiveHighVolumeWeeks++
+      } else {
+        break
+      }
+    }
+
+    // Recommend deload if:
+    // 1. Training consistently (4+ sessions/week) for 4+ weeks
+    // 2. Volume is decreasing (sign of fatigue)
+    // 3. No recent PRs (stagnation)
+    const stagnantExercises = getStagnantExercises(2)
+    const hasStagnation = stagnantExercises.length >= 3
+
+    let shouldDeload = false
+    let reason = ''
+
+    if (consecutiveHighVolumeWeeks >= 4) {
+      if (totalVolumeTrend === 'decreasing' && hasStagnation) {
+        shouldDeload = true
+        reason = 'Your volume is dropping and you have several stagnant exercises. A deload week could help you recover and push past plateaus.'
+      } else if (consecutiveHighVolumeWeeks >= 6) {
+        shouldDeload = true
+        reason = `You've been training hard for ${consecutiveHighVolumeWeeks} weeks straight. Consider a lighter week to prevent burnout and optimize gains.`
+      }
+    }
+
+    return {
+      shouldDeload,
+      reason,
+      weeksOfTraining: consecutiveHighVolumeWeeks,
+      avgWorkoutsPerWeek: Math.round(avgWorkoutsPerWeek * 10) / 10,
+      totalVolumeTrend,
+    }
+  }
+
   // Initialize on mount
   onMounted(() => {
     loadWorkouts()
@@ -241,8 +460,17 @@ export function useWorkoutHistory() {
     calculateAllPRs,
     getPRsThisMonth,
     getExercisePR,
+    // Exercise history
+    getLastPerformedSets,
+    getExerciseHistory,
     // Streak
     calculateDayStreak,
+    // Progressive overload
+    getStagnantExercises,
+    // Calendar data
+    getWorkoutDates,
+    // Deload recommendation
+    getDeloadRecommendation,
     // Weekly goal
     weeklyGoalTarget: readonly(weeklyGoalTarget),
     setWeeklyGoalTarget,

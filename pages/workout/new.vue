@@ -9,7 +9,7 @@ definePageMeta({
 })
 
 const workoutStore = useWorkoutStore()
-const { addWorkout: saveWorkout } = useWorkoutHistory()
+const { addWorkout: saveWorkout, getLastPerformedSets } = useWorkoutHistory()
 const { templates: savedTemplates, loadTemplates, markTemplateUsed } = useTemplates()
 const router = useRouter()
 const route = useRoute()
@@ -473,6 +473,8 @@ onMounted(() => {
                 :set="set"
                 :set-index="setIndex"
                 :exercise-index="index"
+                :exercise-name="log.exercise.name"
+                :previous-sets="getLastPerformedSets(log.exercise.name)"
               />
 
               <!-- Add Set Button -->

@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { NCard, NButton, NTag, NEmpty } from 'naive-ui'
+import { EXERCISE_LIBRARY } from '~/utils/exercises'
+import type { Exercise } from '~/types/database'
 
 definePageMeta({
   middleware: ['auth'],
 })
 
 const route = useRoute()
+const router = useRouter()
 const workoutId = route.params.id as string
 const { getWorkout, loadWorkouts } = useWorkoutHistory()
 const { convertWeight, weightUnit, formatVolume } = useUnits()
+const workoutStore = useWorkoutStore()
 
 // Workout data from history
 interface WorkoutData {
@@ -143,6 +147,54 @@ function getSetTypeColor(type: string) {
     default: return 'default'
   }
 }
+
+// Convert exercise name to Exercise type for workout store
+function getExerciseFromName(name: string): Exercise | null {
+  const libraryEx = EXERCISE_LIBRARY.find(e => e.name === name)
+  if (!libraryEx) return null
+
+  return {
+    id: libraryEx.id,
+    name: libraryEx.name,
+    category: libraryEx.category as Exercise['category'],
+    muscle_groups: [...libraryEx.muscleGroups] as Exercise['muscle_groups'],
+    equipment: [...libraryEx.equipment] as Exercise['equipment'],
+    is_compound: libraryEx.isCompound,
+    is_system: true,
+    user_id: null,
+    description: null,
+    difficulty: libraryEx.difficulty as Exercise['difficulty'],
+    instructions: [],
+    video_url: null,
+    image_url: null,
+    created_at: '',
+  }
+}
+
+// Repeat this workout with the same exercises
+function repeatWorkout() {
+  if (!workout.value) return
+
+  // Start a new workout with the same name
+  workoutStore.startWorkout(workout.value.name)
+
+  // Add all exercises with the same number of sets
+  workout.value.exercises.forEach(ex => {
+    const exercise = getExerciseFromName(ex.name)
+    if (exercise) {
+      workoutStore.addExercise(exercise)
+      const exerciseIndex = workoutStore.exerciseLogs.length - 1
+
+      // Add the same number of sets
+      for (let i = 0; i < ex.sets.length; i++) {
+        workoutStore.addSet(exerciseIndex)
+      }
+    }
+  })
+
+  // Navigate to the active workout page
+  router.push('/workout/new')
+}
 </script>
 
 <template>
@@ -184,6 +236,14 @@ function getSetTypeColor(type: string) {
             <div v-if="workout.rating" class="flex items-center gap-2">
               <span class="text-yellow-500 text-lg">{{ getRatingStars(workout.rating) }}</span>
             </div>
+            <NButton type="primary" @click="repeatWorkout">
+              <template #icon>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </template>
+              Repeat
+            </NButton>
             <NuxtLink :to="`/workout/${workoutId}/edit`">
               <NButton>
                 <template #icon>

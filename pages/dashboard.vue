@@ -6,7 +6,7 @@ definePageMeta({
 })
 
 const auth = useAuth()
-const { activeGoals, fetchGoals, getProgressPercentage, getGoalTypeInfo } = useGoals()
+const { activeGoals, fetchGoals, getProgressPercentage, getGoalTypeInfo, syncGoalsWithWorkouts } = useGoals()
 const { formatVolume } = useUnits()
 const {
   workouts: localWorkouts,
@@ -15,6 +15,8 @@ const {
   weeklyGoalTarget,
   setWeeklyGoalTarget,
   loadWeeklyGoal,
+  getStagnantExercises,
+  getDeloadRecommendation,
 } = useWorkoutHistory()
 
 // Weekly goal edit modal
@@ -92,6 +94,12 @@ const recentWorkouts = computed(() => {
   }))
 })
 
+// Progressive overload alerts - exercises that haven't improved in 2+ weeks
+const stagnantExercises = computed(() => getStagnantExercises(2).slice(0, 3))
+
+// Deload recommendation
+const deloadRecommendation = computed(() => getDeloadRecommendation())
+
 const quickActions = [
   { label: 'Push', icon: 'chest' },
   { label: 'Pull', icon: 'back' },
@@ -100,10 +108,17 @@ const quickActions = [
 ]
 
 // Load data on mount
-onMounted(() => {
+onMounted(async () => {
   loadLocalWorkouts()
   loadWeeklyGoal()
-  fetchGoals()
+  await fetchGoals()
+
+  // Auto-sync goals with workout data
+  if (localWorkouts.value.length > 0 && activeGoals.value.length > 0) {
+    const weeklyWorkouts = stats.value.workoutsThisWeek
+    await syncGoalsWithWorkouts(localWorkouts.value, weeklyWorkouts)
+  }
+
   loading.value = false
 })
 
@@ -197,6 +212,33 @@ function formatDate(dateStr: string) {
       </div>
     </div>
 
+    <!-- Deload Recommendation Banner -->
+    <div
+      v-if="deloadRecommendation?.shouldDeload"
+      class="card p-6 border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+    >
+      <div class="flex items-start gap-4">
+        <div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0">
+          <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="font-semibold text-blue-800 dark:text-blue-200 mb-1">
+            Consider a Deload Week
+          </h3>
+          <p class="text-sm text-blue-700 dark:text-blue-300 mb-3">
+            {{ deloadRecommendation.reason }}
+          </p>
+          <div class="flex items-center gap-4 text-xs text-blue-600 dark:text-blue-400">
+            <span>{{ deloadRecommendation.weeksOfTraining }} weeks training</span>
+            <span>{{ deloadRecommendation.avgWorkoutsPerWeek }} workouts/week</span>
+            <span class="capitalize">Volume {{ deloadRecommendation.totalVolumeTrend }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Goals Progress -->
     <div v-if="activeGoals.length > 0" class="card p-6">
       <div class="flex items-center justify-between mb-4">
@@ -228,6 +270,38 @@ function formatDate(dateStr: string) {
         <NuxtLink v-if="activeGoals.length > 3" to="/goals" class="block text-sm text-center text-indigo-600 dark:text-indigo-400 hover:underline mt-2">
           View all {{ activeGoals.length }} goals
         </NuxtLink>
+      </div>
+    </div>
+
+    <!-- Progressive Overload Alerts -->
+    <div v-if="stagnantExercises.length > 0" class="card p-6 border-l-4 border-amber-500">
+      <div class="flex items-center gap-2 mb-4">
+        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Time to Push Harder</h2>
+      </div>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+        These exercises haven't seen progress in a while. Consider increasing weight, reps, or trying a different variation.
+      </p>
+      <div class="space-y-3">
+        <div
+          v-for="ex in stagnantExercises"
+          :key="ex.exercise"
+          class="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg"
+        >
+          <div>
+            <p class="font-medium text-gray-900 dark:text-white">{{ ex.exercise }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Last PR: {{ ex.lastPR?.weight }}kg × {{ ex.lastPR?.reps }} ({{ ex.daysSinceProgress }} days ago)
+            </p>
+          </div>
+          <NuxtLink :to="`/workout/new`">
+            <NButton size="small" type="primary" ghost>
+              Train
+            </NButton>
+          </NuxtLink>
+        </div>
       </div>
     </div>
 
@@ -338,6 +412,15 @@ function formatDate(dateStr: string) {
           <NButton type="primary" class="!rounded-full">Start Workout</NButton>
         </NuxtLink>
       </div>
+    </div>
+
+    <!-- Two column layout for calendar and muscle balance -->
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- Streak Calendar -->
+      <DashboardStreakCalendar />
+
+      <!-- Muscle Volume Balance -->
+      <DashboardMuscleVolumeBalance />
     </div>
 
     <!-- Weekly Goal -->

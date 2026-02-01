@@ -11,19 +11,67 @@ interface SetData {
   is_pr: boolean
 }
 
+interface PreviousSet {
+  weight: number | null
+  reps: number | null
+}
+
 const props = defineProps<{
   set: SetData
   setIndex: number
   exerciseIndex: number
+  exerciseName: string
+  previousSets?: PreviousSet[]
 }>()
 
 const workoutStore = useWorkoutStore()
-const { weightUnit } = useUnits()
+const { weightUnit, convertWeight } = useUnits()
+
+// Get previous set data for this set index
+const previousSet = computed(() => {
+  if (props.previousSets && props.previousSets[props.setIndex]) {
+    return props.previousSets[props.setIndex]
+  }
+  return null
+})
+
+// Format previous set display
+const previousDisplay = computed(() => {
+  if (!previousSet.value) return null
+  const { weight, reps } = previousSet.value
+  if (weight === null && reps === null) return null
+  if (weight === 0) {
+    // Bodyweight exercise
+    return reps ? `BW × ${reps}` : null
+  }
+  if (weight !== null && reps !== null) {
+    const displayWeight = convertWeight(weight)
+    return `${displayWeight} × ${reps}`
+  }
+  return null
+})
 
 const weight = ref<number | null>(props.set.weight_kg)
 const reps = ref<number | null>(props.set.reps)
+const rpe = ref<number | null>(props.set.rpe)
 const isCompleted = ref(!!props.set.completed_at)
 const isBodyweight = ref(props.set.weight_kg === 0)
+const showRpeSelector = ref(false)
+
+// RPE descriptions
+const rpeDescriptions: Record<number, string> = {
+  6: 'Light',
+  7: 'Moderate',
+  8: 'Hard',
+  9: 'Very Hard',
+  10: 'Max Effort',
+}
+
+function setRpe(value: number) {
+  rpe.value = value
+  showRpeSelector.value = false
+  workoutStore.updateSet(props.exerciseIndex, props.setIndex, { rpe: value })
+}
 
 // Check if this is a valid completed set
 function isValidSet(w: number | null, r: number | null, bw: boolean): boolean {
@@ -81,7 +129,7 @@ function removeSet() {
 
     <!-- Previous -->
     <div class="col-span-3 text-sm text-gray-400 dark:text-gray-500">
-      -
+      {{ previousDisplay || '-' }}
     </div>
 
     <!-- Weight -->
@@ -135,7 +183,38 @@ function removeSet() {
 
     <!-- Actions -->
     <div class="col-span-2 flex justify-center gap-1">
-      <span v-if="isCompleted" class="text-green-600 dark:text-green-400">
+      <!-- RPE Button (shows after set is completed) -->
+      <div v-if="isCompleted" class="relative">
+        <button
+          class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors"
+          :class="rpe
+            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+            : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'"
+          @click="showRpeSelector = !showRpeSelector"
+          title="Rate of Perceived Exertion"
+        >
+          {{ rpe ? `@${rpe}` : 'RPE' }}
+        </button>
+
+        <!-- RPE Dropdown -->
+        <div
+          v-if="showRpeSelector"
+          class="absolute right-0 top-full mt-1 z-10 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 min-w-[120px]"
+        >
+          <button
+            v-for="val in [6, 7, 8, 9, 10]"
+            :key="val"
+            class="w-full px-2 py-1 text-left text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between"
+            :class="rpe === val ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300'"
+            @click="setRpe(val)"
+          >
+            <span>@{{ val }}</span>
+            <span class="text-xs text-gray-400">{{ rpeDescriptions[val] }}</span>
+          </button>
+        </div>
+      </div>
+
+      <span v-if="isCompleted && !showRpeSelector" class="text-green-600 dark:text-green-400">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
         </svg>

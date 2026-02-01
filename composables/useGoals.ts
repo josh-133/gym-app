@@ -181,6 +181,56 @@ export function useGoals() {
     }
   }
 
+  // Auto-sync goals with workout data
+  // This updates strength goals based on PRs and frequency goals based on workouts
+  async function syncGoalsWithWorkouts(
+    workoutHistory: { exercises: { name: string; sets: { weight: number | null; reps: number | null; completed: boolean }[] }[] }[],
+    weeklyWorkouts: number
+  ) {
+    const updates: Promise<any>[] = []
+
+    for (const goal of goals.value) {
+      if (goal.is_completed) continue
+
+      if (goal.goal_type === 'strength') {
+        // For strength goals, extract exercise name from title and find max weight
+        // Goal title format: "Bench Press 100kg" or just contains exercise name
+        const exerciseName = goal.title.split(' ').slice(0, -1).join(' ') || goal.title
+
+        let maxWeight = 0
+        for (const workout of workoutHistory) {
+          const exercise = workout.exercises.find(e =>
+            e.name.toLowerCase().includes(exerciseName.toLowerCase()) ||
+            exerciseName.toLowerCase().includes(e.name.toLowerCase())
+          )
+          if (exercise) {
+            for (const set of exercise.sets) {
+              if (set.completed && set.weight && set.weight > maxWeight) {
+                maxWeight = set.weight
+              }
+            }
+          }
+        }
+
+        // Update if we found a higher value than current
+        if (maxWeight > 0 && maxWeight > goal.current_value) {
+          updates.push(updateGoalProgress(goal.id, maxWeight))
+        }
+      } else if (goal.goal_type === 'workout_frequency') {
+        // For frequency goals, update with current week's workout count
+        if (weeklyWorkouts !== goal.current_value) {
+          updates.push(updateGoalProgress(goal.id, weeklyWorkouts))
+        }
+      }
+    }
+
+    if (updates.length > 0) {
+      await Promise.all(updates)
+    }
+
+    return updates.length
+  }
+
   return {
     goals,
     loading,
@@ -193,5 +243,6 @@ export function useGoals() {
     completedGoals,
     getProgressPercentage,
     getGoalTypeInfo,
+    syncGoalsWithWorkouts,
   }
 }
