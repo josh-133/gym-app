@@ -189,6 +189,7 @@ export interface CardioLog {
   calories_burned: number | null
   elevation_gain_m: number | null
   notes: string | null
+  completed_at?: string | null
 }
 
 // Personal records

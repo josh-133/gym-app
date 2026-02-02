@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NCard, NButton, NTag, NEmpty } from 'naive-ui'
-import { EXERCISE_LIBRARY } from '~/utils/exercises'
+import { EXERCISE_LIBRARY, type CardioTrackingType } from '~/utils/exercises'
 import type { Exercise } from '~/types/database'
 
 definePageMeta({
@@ -11,8 +11,16 @@ const route = useRoute()
 const router = useRouter()
 const workoutId = route.params.id as string
 const { getWorkout, loadWorkouts } = useWorkoutHistory()
-const { convertWeight, weightUnit, formatVolume } = useUnits()
+const { convertWeight, weightUnit, formatVolume, unitSystem } = useUnits()
 const workoutStore = useWorkoutStore()
+
+// Cardio data interface
+interface CardioData {
+  duration_sec: number
+  distance_km?: number
+  calories?: number
+  completed: boolean
+}
 
 // Workout data from history
 interface WorkoutData {
@@ -27,6 +35,7 @@ interface WorkoutData {
   notes: string | null
   exercises: {
     name: string
+    category?: string
     sets: {
       set_number: number
       weight: number | null
@@ -34,6 +43,7 @@ interface WorkoutData {
       type: string
       is_pr?: boolean
     }[]
+    cardio?: CardioData
   }[]
 }
 
@@ -93,6 +103,7 @@ onMounted(async () => {
       notes: savedWorkout.notes,
       exercises: savedWorkout.exercises.map(ex => ({
         name: ex.name,
+        category: ex.category,
         sets: ex.sets.map((set, index) => ({
           set_number: index + 1,
           weight: set.weight,
@@ -100,6 +111,7 @@ onMounted(async () => {
           type: 'working',
           is_pr: false,
         })),
+        cardio: ex.cardio,
       })),
     }
   } else {
@@ -136,6 +148,55 @@ function formatTime(dateStr: string) {
 
 function getRatingStars(rating: number) {
   return '★'.repeat(rating) + '☆'.repeat(5 - rating)
+}
+
+// Check if an exercise is a cardio exercise
+function isCardioExercise(exerciseName: string): boolean {
+  const libraryEx = EXERCISE_LIBRARY.find(e => e.name === exerciseName)
+  return libraryEx?.category === 'cardio'
+}
+
+// Get the tracking type for a cardio exercise
+function getCardioTrackingType(exerciseName: string): CardioTrackingType | undefined {
+  const libraryEx = EXERCISE_LIBRARY.find(e => e.name === exerciseName)
+  return libraryEx?.trackingType
+}
+
+// Format cardio duration (hours:minutes:seconds)
+function formatCardioDuration(seconds: number): string {
+  const hrs = Math.floor(seconds / 3600)
+  const mins = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+// Format distance based on unit system
+function formatDistance(km: number): string {
+  if (unitSystem.value === 'imperial') {
+    const miles = km * 0.621371
+    return `${miles.toFixed(2)} mi`
+  }
+  return `${km.toFixed(2)} km`
+}
+
+// Calculate and format pace
+function formatPace(durationSec: number, distanceKm: number): string {
+  if (!durationSec || !distanceKm) return '-'
+
+  if (unitSystem.value === 'imperial') {
+    const paceSecPerMile = durationSec / (distanceKm * 0.621371)
+    const paceMin = Math.floor(paceSecPerMile / 60)
+    const paceSec = Math.round(paceSecPerMile % 60)
+    return `${paceMin}:${paceSec.toString().padStart(2, '0')} /mi`
+  }
+
+  const paceSecPerKm = durationSec / distanceKm
+  const paceMin = Math.floor(paceSecPerKm / 60)
+  const paceSec = Math.round(paceSecPerKm % 60)
+  return `${paceMin}:${paceSec.toString().padStart(2, '0')} /km`
 }
 
 function getSetTypeColor(type: string) {
@@ -306,12 +367,58 @@ function repeatWorkout() {
               <div class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
                 <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ index + 1 }}</span>
               </div>
-              <h3 class="font-semibold text-gray-900 dark:text-white">{{ exercise.name }}</h3>
+              <div>
+                <h3 class="font-semibold text-gray-900 dark:text-white">{{ exercise.name }}</h3>
+                <NTag v-if="isCardioExercise(exercise.name)" size="tiny" type="success">Cardio</NTag>
+              </div>
             </div>
           </template>
 
-          <!-- Sets Table -->
-          <div class="overflow-x-auto">
+          <!-- Cardio Display -->
+          <div v-if="exercise.cardio && exercise.cardio.completed" class="space-y-4">
+            <!-- Reps-based cardio (box jumps, burpees, etc.) -->
+            <div v-if="getCardioTrackingType(exercise.name) === 'reps'" class="grid grid-cols-1 gap-4">
+              <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ exercise.cardio.duration_sec }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Reps</p>
+              </div>
+            </div>
+
+            <!-- Duration + Distance cardio (running, cycling, etc.) -->
+            <div v-else-if="getCardioTrackingType(exercise.name) === 'duration_distance'" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(exercise.cardio.duration_sec) }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
+              </div>
+              <div v-if="exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatDistance(exercise.cardio.distance_km) }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Distance</p>
+              </div>
+              <div v-if="exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatPace(exercise.cardio.duration_sec, exercise.cardio.distance_km) }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Pace</p>
+              </div>
+              <div v-if="exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ exercise.cardio.calories }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
+              </div>
+            </div>
+
+            <!-- Duration-only cardio (stair climber, jump rope, etc.) -->
+            <div v-else class="grid grid-cols-2 gap-4">
+              <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(exercise.cardio.duration_sec) }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
+              </div>
+              <div v-if="exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ exercise.cardio.calories }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Strength Sets Table -->
+          <div v-else class="overflow-x-auto">
             <table class="w-full">
               <thead>
                 <tr class="text-left text-sm text-gray-500 dark:text-gray-400">
