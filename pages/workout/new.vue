@@ -11,7 +11,7 @@ definePageMeta({
 
 const workoutStore = useWorkoutStore()
 const { addWorkout: saveWorkout, getLastPerformedSets } = useWorkoutHistory()
-const { templates: savedTemplates, loadTemplates, markTemplateUsed } = useTemplates()
+const { templates: savedTemplates, loadTemplates, markTemplateUsed, addTemplate } = useTemplates()
 const router = useRouter()
 const route = useRoute()
 
@@ -25,6 +25,10 @@ const workoutDate = ref<number>(Date.now()) // Timestamp for date picker
 const useManualDuration = ref(false)
 const manualDurationHours = ref(0)
 const manualDurationMinutes = ref(30)
+
+// Save as template option
+const saveAsTemplate = ref(false)
+const templateName = ref('')
 
 // Transform saved templates to the format expected by the UI
 const templates = computed(() => {
@@ -255,7 +259,23 @@ async function confirmFinishWorkout() {
       notes: result.session.notes,
     })
 
+    // Save as template if enabled
+    if (saveAsTemplate.value && templateName.value.trim()) {
+      addTemplate({
+        name: templateName.value.trim(),
+        exercises: result.exerciseLogs.map(log => ({
+          name: log.exercise.name,
+          sets: log.sets.length || 1,
+          defaultReps: log.sets.find(s => s.reps)?.reps || undefined,
+          defaultWeight: log.sets.find(s => s.weight_kg)?.weight_kg || undefined,
+        })),
+      })
+    }
+
     showFinishModal.value = false
+    // Reset template save state
+    saveAsTemplate.value = false
+    templateName.value = ''
     // Navigate to workout history
     router.push('/workout')
   }
@@ -726,6 +746,29 @@ onMounted(() => {
                 class="w-full"
               />
             </div>
+          </div>
+        </div>
+
+        <!-- Save as Template -->
+        <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+              </svg>
+              <span class="text-sm text-gray-600 dark:text-gray-400">Save as template</span>
+            </div>
+            <NSwitch v-model:value="saveAsTemplate" />
+          </div>
+
+          <!-- Template Name Input -->
+          <div v-if="saveAsTemplate">
+            <label class="text-xs text-gray-500 dark:text-gray-400 block mb-1">Template Name</label>
+            <NInput
+              v-model:value="templateName"
+              placeholder="e.g., Upper Body Day"
+              size="small"
+            />
           </div>
         </div>
       </div>
