@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NProgress, NCard, NModal, NInputNumber } from 'naive-ui'
+import { NButton, NProgress, NCard, NModal, NInputNumber, NDatePicker } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
@@ -7,7 +7,19 @@ definePageMeta({
 
 const auth = useAuth()
 const { activeGoals, fetchGoals, getProgressPercentage, getGoalTypeInfo, syncGoalsWithWorkouts } = useGoals()
-const { formatVolume } = useUnits()
+const { formatVolume, weightUnit, isImperial, toMetricWeight } = useUnits()
+const { addMeasurement, fetchMeasurements, latestMeasurement } = useBodyMeasurements()
+const {
+  nutritionGoals,
+  dailyTotals,
+  calorieProgress,
+  proteinProgress,
+  carbsProgress,
+  fatProgress,
+  fetchNutritionGoals,
+  fetchFoodEntries,
+} = useNutrition()
+const notification = useNotification()
 const {
   workouts: localWorkouts,
   loadWorkouts: loadLocalWorkouts,
@@ -22,6 +34,15 @@ const {
 // Weekly goal edit modal
 const showWeeklyGoalModal = ref(false)
 const editingWeeklyGoal = ref(5)
+
+// Quick weight log modal
+const showWeightModal = ref(false)
+const savingWeight = ref(false)
+const weightForm = ref({
+  date: Date.now(),
+  weight: null as number | null,
+  bodyFat: null as number | null,
+})
 
 // Loading state
 const loading = ref(true)
@@ -112,6 +133,9 @@ onMounted(async () => {
   loadLocalWorkouts()
   loadWeeklyGoal()
   await fetchGoals()
+  await fetchMeasurements()
+  await fetchNutritionGoals()
+  await fetchFoodEntries()
 
   // Auto-sync goals with workout data
   if (localWorkouts.value.length > 0 && activeGoals.value.length > 0) {
@@ -131,6 +155,34 @@ function openWeeklyGoalModal() {
 function saveWeeklyGoal() {
   setWeeklyGoalTarget(editingWeeklyGoal.value)
   showWeeklyGoalModal.value = false
+}
+
+// Weight logging functions
+function openWeightModal() {
+  weightForm.value = {
+    date: Date.now(),
+    weight: null,
+    bodyFat: null,
+  }
+  showWeightModal.value = true
+}
+
+async function saveWeight() {
+  savingWeight.value = true
+  try {
+    await addMeasurement({
+      measured_at: new Date(weightForm.value.date).toISOString(),
+      weight_kg: toMetricWeight(weightForm.value.weight),
+      body_fat_percent: weightForm.value.bodyFat,
+    })
+    showWeightModal.value = false
+    notification.success('Weight logged!')
+  } catch (err) {
+    console.error('Error saving weight:', err)
+    notification.error('Failed to save weight')
+  } finally {
+    savingWeight.value = false
+  }
 }
 
 function formatDuration(minutes: number) {
@@ -211,6 +263,76 @@ function formatDate(dateStr: string) {
         <p class="text-sm text-gray-400 dark:text-gray-500 mt-1">this month</p>
       </div>
     </div>
+
+    <!-- Quick Log Weight Card -->
+    <div
+      class="card p-4 cursor-pointer hover:shadow-md transition-shadow flex items-center justify-between"
+      @click="openWeightModal"
+    >
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+          <svg class="w-6 h-6 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+          </svg>
+        </div>
+        <div>
+          <p class="font-semibold text-primary-900 dark:text-white">Log Weight</p>
+          <p v-if="latestMeasurement?.weight_kg" class="text-sm text-gray-500 dark:text-gray-400">
+            Last: {{ isImperial ? (latestMeasurement.weight_kg * 2.20462).toFixed(1) : latestMeasurement.weight_kg.toFixed(1) }}{{ weightUnit }}
+          </p>
+          <p v-else class="text-sm text-gray-500 dark:text-gray-400">Track your body weight</p>
+        </div>
+      </div>
+      <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+    </div>
+
+    <!-- Nutrition Widget -->
+    <NuxtLink to="/nutrition" class="block">
+      <div class="card p-4 hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+            </div>
+            <div>
+              <p class="font-semibold text-primary-900 dark:text-white">Today's Nutrition</p>
+              <p v-if="nutritionGoals" class="text-sm text-gray-500 dark:text-gray-400">
+                {{ Math.round(dailyTotals.calories) }} / {{ nutritionGoals.daily_calories }} cal
+              </p>
+              <p v-else class="text-sm text-gray-500 dark:text-gray-400">Set your nutrition goals</p>
+            </div>
+          </div>
+          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+        <div v-if="nutritionGoals" class="space-y-2">
+          <!-- Calorie Bar -->
+          <div class="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div
+              class="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-500 to-accent-500 rounded-full transition-all"
+              :style="{ width: `${calorieProgress}%` }"
+            />
+          </div>
+          <!-- Macro Pills -->
+          <div class="flex gap-2 text-xs">
+            <span class="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+              P: {{ Math.round(dailyTotals.protein_g) }}g
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+              C: {{ Math.round(dailyTotals.carbs_g) }}g
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+              F: {{ Math.round(dailyTotals.fat_g) }}g
+            </span>
+          </div>
+        </div>
+      </div>
+    </NuxtLink>
 
     <!-- Deload Recommendation Banner -->
     <div
@@ -476,6 +598,39 @@ function formatDate(dateStr: string) {
         <div class="flex gap-3">
           <NButton class="flex-1" @click="showWeeklyGoalModal = false">Cancel</NButton>
           <NButton type="primary" class="flex-1" @click="saveWeeklyGoal">Save</NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <!-- Quick Weight Log Modal -->
+    <NModal
+      v-model:show="showWeightModal"
+      preset="card"
+      title="Log Weight"
+      :style="{ width: '90%', maxWidth: '400px' }"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date</label>
+          <NDatePicker v-model:value="weightForm.date" type="date" class="w-full" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Weight ({{ weightUnit }})</label>
+            <NInputNumber v-model:value="weightForm.weight" :precision="1" :placeholder="isImperial ? '180' : '82'" class="w-full" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Body Fat (%)</label>
+            <NInputNumber v-model:value="weightForm.bodyFat" :precision="1" placeholder="15.0" class="w-full" />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" :disabled="savingWeight" @click="showWeightModal = false">Cancel</NButton>
+          <NButton type="primary" class="flex-1" :loading="savingWeight" @click="saveWeight">Save</NButton>
         </div>
       </template>
     </NModal>

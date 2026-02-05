@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NCard, NButton, NTag, NEmpty } from 'naive-ui'
+import { NCard, NButton, NTag, NEmpty, NModal } from 'naive-ui'
 import { EXERCISE_LIBRARY, type CardioTrackingType } from '~/utils/exercises'
 import type { Exercise } from '~/types/database'
 
@@ -10,7 +10,7 @@ definePageMeta({
 const route = useRoute()
 const router = useRouter()
 const workoutId = route.params.id as string
-const { getWorkout, loadWorkouts } = useWorkoutHistory()
+const { getWorkout, loadWorkouts, deleteWorkout } = useWorkoutHistory()
 const { convertWeight, weightUnit, formatVolume, unitSystem } = useUnits()
 const workoutStore = useWorkoutStore()
 
@@ -50,6 +50,13 @@ interface WorkoutData {
 const workout = ref<WorkoutData | null>(null)
 const loading = ref(true)
 const notFound = ref(false)
+const showDeleteModal = ref(false)
+
+// Delete workout handler
+function handleDeleteWorkout() {
+  deleteWorkout(workoutId)
+  router.push('/workout')
+}
 
 // Computed stats
 const totalSets = computed(() => {
@@ -315,6 +322,13 @@ function repeatWorkout() {
                 Edit
               </NButton>
             </NuxtLink>
+            <NButton type="error" quaternary @click="showDeleteModal = true">
+              <template #icon>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </template>
+            </NButton>
           </div>
         </div>
       </div>
@@ -456,5 +470,36 @@ function repeatWorkout() {
         </NCard>
       </div>
     </template>
+
+    <!-- Delete Confirmation Modal -->
+    <NModal
+      v-model:show="showDeleteModal"
+      preset="card"
+      title="Delete Workout"
+      :style="{ width: '90%', maxWidth: '400px' }"
+    >
+      <div class="text-center py-4">
+        <div class="w-14 h-14 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+          <svg class="w-7 h-7 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete this workout?</h3>
+        <p class="text-gray-500 dark:text-gray-400">
+          This will permanently delete "{{ workout?.name }}" and all its data. This action cannot be undone.
+        </p>
+      </div>
+
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" @click="showDeleteModal = false">
+            Cancel
+          </NButton>
+          <NButton type="error" class="flex-1" @click="handleDeleteWorkout">
+            Delete
+          </NButton>
+        </div>
+      </template>
+    </NModal>
   </div>
 </template>

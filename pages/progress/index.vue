@@ -13,7 +13,8 @@ const {
   setWeeklyGoalTarget,
   loadWeeklyGoal,
 } = useWorkoutHistory()
-const { formatVolume } = useUnits()
+const { formatVolume, weightUnit, isImperial } = useUnits()
+const { fetchMeasurements, latestMeasurement } = useBodyMeasurements()
 
 // Weekly goal edit modal
 const showWeeklyGoalModal = ref(false)
@@ -23,6 +24,14 @@ const editingWeeklyGoal = ref(5)
 onMounted(() => {
   loadWorkouts()
   loadWeeklyGoal()
+  fetchMeasurements()
+})
+
+// Format weight for display
+const currentWeightDisplay = computed(() => {
+  if (!latestMeasurement.value?.weight_kg) return null
+  const weight = latestMeasurement.value.weight_kg
+  return isImperial.value ? (weight * 2.20462).toFixed(1) : weight.toFixed(1)
 })
 
 // Weekly goal editing
@@ -215,6 +224,7 @@ const analyticsCards = [
     icon: 'body',
     to: '/progress/body',
     gradient: 'from-success-500 via-secondary-500 to-primary-500',
+    showWeight: true,
   },
 ]
 
@@ -311,7 +321,10 @@ function formatDuration(minutes: number) {
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {{ card.description }}
             </p>
-
+            <!-- Show current weight for Body Stats card -->
+            <p v-if="card.showWeight && currentWeightDisplay" class="text-sm font-medium text-primary-600 dark:text-primary-400 mt-2">
+              Current: {{ currentWeightDisplay }}{{ weightUnit }}
+            </p>
           </div>
 
           <!-- Arrow -->

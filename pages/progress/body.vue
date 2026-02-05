@@ -34,14 +34,21 @@ const timeRangeOptions = [
   { label: 'All Time', value: 'all' },
 ]
 
-// Add measurement modal
-const showAddModal = ref(false)
+// Separate modals for weight and measurements
+const showWeightModal = ref(false)
+const showMeasurementsModal = ref(false)
 const saving = ref(false)
-const measurementType = ref('weight')
-const newMeasurement = ref({
+
+// Weight form (simple)
+const weightForm = ref({
   date: Date.now(),
   weight: null as number | null,
   bodyFat: null as number | null,
+})
+
+// Measurements form (detailed)
+const measurementsForm = ref({
+  date: Date.now(),
   chest: null as number | null,
   waist: null as number | null,
   hips: null as number | null,
@@ -51,11 +58,17 @@ const newMeasurement = ref({
   rightThigh: null as number | null,
 })
 
-function resetForm() {
-  newMeasurement.value = {
+function resetWeightForm() {
+  weightForm.value = {
     date: Date.now(),
     weight: null,
     bodyFat: null,
+  }
+}
+
+function resetMeasurementsForm() {
+  measurementsForm.value = {
+    date: Date.now(),
     chest: null,
     waist: null,
     hips: null,
@@ -140,10 +153,10 @@ const measurementChanges = computed(() => {
   }
 
   return {
-    chest: calcChange(first.chest, last.chest),
-    waist: calcChange(first.waist, last.waist),
-    hips: calcChange(first.hips, last.hips),
-    arms: calcChange(first.arms, last.arms),
+    chest: first.chest && last.chest ? calcChange(first.chest, last.chest) : null,
+    waist: first.waist && last.waist ? calcChange(first.waist, last.waist) : null,
+    hips: first.hips && last.hips ? calcChange(first.hips, last.hips) : null,
+    arms: first.arms && last.arms ? calcChange(first.arms, last.arms) : null,
   }
 })
 
@@ -186,41 +199,61 @@ function getWeightPosition(weight: number) {
   return 100 - ((weight - minWeight.value) / (maxWeight.value - minWeight.value)) * 100
 }
 
-function openAddModal(type: string) {
-  measurementType.value = type
-  resetForm()
-  showAddModal.value = true
+function openWeightModal() {
+  resetWeightForm()
+  showWeightModal.value = true
 }
 
-async function saveMeasurement() {
+function openMeasurementsModal() {
+  resetMeasurementsForm()
+  showMeasurementsModal.value = true
+}
+
+async function saveWeight() {
   saving.value = true
   try {
-    // Convert imperial inputs to metric for storage
-    // Average left/right arm and thigh measurements for storage
-    const avgArm = newMeasurement.value.leftArm && newMeasurement.value.rightArm
-      ? (newMeasurement.value.leftArm + newMeasurement.value.rightArm) / 2
-      : newMeasurement.value.leftArm || newMeasurement.value.rightArm || null
+    await addMeasurement({
+      measured_at: new Date(weightForm.value.date).toISOString(),
+      weight_kg: toMetricWeight(weightForm.value.weight),
+      body_fat_percent: weightForm.value.bodyFat,
+    })
+    showWeightModal.value = false
+    resetWeightForm()
+    notification.success('Weight logged!')
+  } catch (err) {
+    console.error('Error saving weight:', err)
+    notification.error('Failed to save weight. Please try again.')
+  } finally {
+    saving.value = false
+  }
+}
 
-    const avgThigh = newMeasurement.value.leftThigh && newMeasurement.value.rightThigh
-      ? (newMeasurement.value.leftThigh + newMeasurement.value.rightThigh) / 2
-      : newMeasurement.value.leftThigh || newMeasurement.value.rightThigh || null
+async function saveMeasurements() {
+  saving.value = true
+  try {
+    // Average left/right arm and thigh measurements for storage
+    const avgArm = measurementsForm.value.leftArm && measurementsForm.value.rightArm
+      ? (measurementsForm.value.leftArm + measurementsForm.value.rightArm) / 2
+      : measurementsForm.value.leftArm || measurementsForm.value.rightArm || null
+
+    const avgThigh = measurementsForm.value.leftThigh && measurementsForm.value.rightThigh
+      ? (measurementsForm.value.leftThigh + measurementsForm.value.rightThigh) / 2
+      : measurementsForm.value.leftThigh || measurementsForm.value.rightThigh || null
 
     await addMeasurement({
-      measured_at: new Date(newMeasurement.value.date).toISOString(),
-      weight_kg: toMetricWeight(newMeasurement.value.weight),
-      body_fat_percent: newMeasurement.value.bodyFat,
-      chest_cm: toMetricLength(newMeasurement.value.chest),
-      waist_cm: toMetricLength(newMeasurement.value.waist),
-      hips_cm: toMetricLength(newMeasurement.value.hips),
+      measured_at: new Date(measurementsForm.value.date).toISOString(),
+      chest_cm: toMetricLength(measurementsForm.value.chest),
+      waist_cm: toMetricLength(measurementsForm.value.waist),
+      hips_cm: toMetricLength(measurementsForm.value.hips),
       bicep_cm: toMetricLength(avgArm),
       thigh_cm: toMetricLength(avgThigh),
     })
-    showAddModal.value = false
-    resetForm()
-    notification.success('Measurement saved!')
+    showMeasurementsModal.value = false
+    resetMeasurementsForm()
+    notification.success('Measurements saved!')
   } catch (err) {
-    console.error('Error saving measurement:', err)
-    notification.error('Failed to save measurement. Please try again.')
+    console.error('Error saving measurements:', err)
+    notification.error('Failed to save measurements. Please try again.')
   } finally {
     saving.value = false
   }
@@ -244,13 +277,21 @@ async function saveMeasurement() {
           :options="timeRangeOptions"
           style="width: 140px"
         />
-        <NButton type="primary" @click="openAddModal('all')">
+        <NButton type="primary" @click="openWeightModal">
           <template #icon>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
             </svg>
           </template>
-          Add Entry
+          Log Weight
+        </NButton>
+        <NButton @click="openMeasurementsModal">
+          <template #icon>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </template>
+          Measurements
         </NButton>
       </div>
     </div>
@@ -269,14 +310,19 @@ async function saveMeasurement() {
       </div>
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Body Stats Yet</h3>
       <p class="text-gray-500 dark:text-gray-400 mb-6">Track your weight, body fat, and measurements to monitor your progress!</p>
-      <NButton type="primary" @click="openAddModal('all')">
-        <template #icon>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
-        </template>
-        Add Your First Entry
-      </NButton>
+      <div class="flex gap-2">
+        <NButton type="primary" @click="openWeightModal">
+          <template #icon>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+            </svg>
+          </template>
+          Log Weight
+        </NButton>
+        <NButton @click="openMeasurementsModal">
+          Measurements
+        </NButton>
+      </div>
     </div>
 
     <template v-else-if="hasData">
@@ -406,7 +452,7 @@ async function saveMeasurement() {
             :style="{ width: `${progressToGoalWeight}%` }"
           ></div>
         </div>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">{{ progressToGoalWeight }}% complete · {{ convertWeight(currentStatsMetric.weight - goals.targetWeight).toFixed(1) }}{{ weightUnit }} to go</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">{{ progressToGoalWeight }}% complete · {{ (convertWeight(currentStatsMetric.weight - goals.targetWeight) ?? 0).toFixed(1) }}{{ weightUnit }} to go</p>
       </div>
     </NCard>
 
@@ -484,7 +530,7 @@ async function saveMeasurement() {
             </div>
             <div class="p-3 bg-success-50 dark:bg-success-900/20 rounded-xl">
               <p class="text-sm text-gray-500 dark:text-gray-400">Arms (avg)</p>
-              <p class="text-xl font-bold text-success-600 dark:text-success-400">{{ currentStats.leftArm || currentStats.rightArm ? ((currentStats.leftArm + currentStats.rightArm) / 2).toFixed(1) : '—' }}<span v-if="currentStats.leftArm || currentStats.rightArm">{{ lengthUnit }}</span></p>
+              <p class="text-xl font-bold text-success-600 dark:text-success-400">{{ currentStats.leftArm || currentStats.rightArm ? (((currentStats.leftArm ?? 0) + (currentStats.rightArm ?? 0)) / 2).toFixed(1) : '—' }}<span v-if="currentStats.leftArm || currentStats.rightArm">{{ lengthUnit }}</span></p>
               <p v-if="measurementChanges.arms !== null" class="text-xs" :class="measurementChanges.arms >= 0 ? 'text-success-600' : 'text-red-500'">
                 {{ measurementChanges.arms > 0 ? '+' : '' }}{{ measurementChanges.arms }}{{ lengthUnit }}
               </p>
@@ -576,60 +622,98 @@ async function saveMeasurement() {
     </NCard>
     </template>
 
-    <!-- Add Measurement Modal (outside conditional templates so it always renders) -->
+    <!-- Quick Weight Log Modal -->
     <NModal
-      v-model:show="showAddModal"
+      v-model:show="showWeightModal"
       preset="card"
-      title="Add Body Stats"
-      :style="{ width: '90%', maxWidth: '500px' }"
+      title="Log Weight"
+      :style="{ width: '90%', maxWidth: '400px' }"
     >
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date</label>
-          <NDatePicker v-model:value="newMeasurement.date" type="date" class="w-full" />
+          <NDatePicker v-model:value="weightForm.date" type="date" class="w-full" />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Weight ({{ weightUnit }})</label>
-            <NInputNumber v-model:value="newMeasurement.weight" :precision="1" :placeholder="isImperial ? '180' : '82'" class="w-full" />
+            <NInputNumber v-model:value="weightForm.weight" :precision="1" :placeholder="isImperial ? '180' : '82'" class="w-full" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Body Fat (%)</label>
-            <NInputNumber v-model:value="newMeasurement.bodyFat" :precision="1" placeholder="15.0" class="w-full" />
+            <NInputNumber v-model:value="weightForm.bodyFat" :precision="1" placeholder="15.0" class="w-full" />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <NButton :disabled="saving" @click="showWeightModal = false; resetWeightForm()">Cancel</NButton>
+          <NButton type="primary" :loading="saving" @click="saveWeight">Save</NButton>
+        </div>
+      </template>
+    </NModal>
+
+    <!-- Body Measurements Modal -->
+    <NModal
+      v-model:show="showMeasurementsModal"
+      preset="card"
+      title="Add Measurements"
+      :style="{ width: '90%', maxWidth: '500px' }"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date</label>
+          <NDatePicker v-model:value="measurementsForm.date" type="date" class="w-full" />
+        </div>
+
+        <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+          <p class="font-medium text-gray-900 dark:text-white mb-3">Upper Body ({{ lengthUnit }})</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Chest</label>
+              <NInputNumber v-model:value="measurementsForm.chest" :precision="1" :placeholder="isImperial ? '40' : '102'" class="w-full" />
+            </div>
+            <div>
+              <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Waist</label>
+              <NInputNumber v-model:value="measurementsForm.waist" :precision="1" :placeholder="isImperial ? '33' : '84'" class="w-full" />
+            </div>
           </div>
         </div>
 
         <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-          <p class="font-medium text-gray-900 dark:text-white mb-3">Measurements ({{ lengthUnit }})</p>
+          <p class="font-medium text-gray-900 dark:text-white mb-3">Lower Body ({{ lengthUnit }})</p>
+          <div>
+            <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Hips</label>
+            <NInputNumber v-model:value="measurementsForm.hips" :precision="1" :placeholder="isImperial ? '38' : '98'" class="w-full" />
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+          <p class="font-medium text-gray-900 dark:text-white mb-3">Arms ({{ lengthUnit }})</p>
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Chest</label>
-              <NInputNumber v-model:value="newMeasurement.chest" :precision="1" :placeholder="isImperial ? '40' : '102'" class="w-full" />
-            </div>
-            <div>
-              <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Waist</label>
-              <NInputNumber v-model:value="newMeasurement.waist" :precision="1" :placeholder="isImperial ? '33' : '84'" class="w-full" />
-            </div>
-            <div>
-              <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Hips</label>
-              <NInputNumber v-model:value="newMeasurement.hips" :precision="1" :placeholder="isImperial ? '38' : '98'" class="w-full" />
-            </div>
-            <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Left Arm</label>
-              <NInputNumber v-model:value="newMeasurement.leftArm" :precision="1" :placeholder="isImperial ? '15' : '38'" class="w-full" />
+              <NInputNumber v-model:value="measurementsForm.leftArm" :precision="1" :placeholder="isImperial ? '15' : '38'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Right Arm</label>
-              <NInputNumber v-model:value="newMeasurement.rightArm" :precision="1" :placeholder="isImperial ? '15' : '38'" class="w-full" />
+              <NInputNumber v-model:value="measurementsForm.rightArm" :precision="1" :placeholder="isImperial ? '15' : '38'" class="w-full" />
             </div>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+          <p class="font-medium text-gray-900 dark:text-white mb-3">Thighs ({{ lengthUnit }})</p>
+          <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Left Thigh</label>
-              <NInputNumber v-model:value="newMeasurement.leftThigh" :precision="1" :placeholder="isImperial ? '23' : '58'" class="w-full" />
+              <NInputNumber v-model:value="measurementsForm.leftThigh" :precision="1" :placeholder="isImperial ? '23' : '58'" class="w-full" />
             </div>
             <div>
               <label class="block text-sm text-gray-500 dark:text-gray-400 mb-1">Right Thigh</label>
-              <NInputNumber v-model:value="newMeasurement.rightThigh" :precision="1" :placeholder="isImperial ? '23' : '58'" class="w-full" />
+              <NInputNumber v-model:value="measurementsForm.rightThigh" :precision="1" :placeholder="isImperial ? '23' : '58'" class="w-full" />
             </div>
           </div>
         </div>
@@ -637,8 +721,8 @@ async function saveMeasurement() {
 
       <template #footer>
         <div class="flex justify-end gap-3">
-          <NButton :disabled="saving" @click="showAddModal = false; resetForm()">Cancel</NButton>
-          <NButton type="primary" :loading="saving" @click="saveMeasurement">Save Measurement</NButton>
+          <NButton :disabled="saving" @click="showMeasurementsModal = false; resetMeasurementsForm()">Cancel</NButton>
+          <NButton type="primary" :loading="saving" @click="saveMeasurements">Save</NButton>
         </div>
       </template>
     </NModal>
