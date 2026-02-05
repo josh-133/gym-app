@@ -132,25 +132,46 @@ export function useNutrition() {
   }) {
     if (!$supabase || !user.value) throw new Error('Not authenticated')
 
-    const { data, error } = await $supabase
-      .from('nutrition_goals')
-      .upsert({
-        user_id: user.value.id,
-        daily_calories: goals.daily_calories,
-        daily_protein_g: goals.daily_protein_g,
-        daily_carbs_g: goals.daily_carbs_g,
-        daily_fat_g: goals.daily_fat_g,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'user_id',
-      })
-      .select()
-      .single()
+    // Check if goals already exist
+    if (nutritionGoals.value?.id) {
+      // Update existing goals
+      const { data, error } = await $supabase
+        .from('nutrition_goals')
+        .update({
+          daily_calories: goals.daily_calories,
+          daily_protein_g: goals.daily_protein_g,
+          daily_carbs_g: goals.daily_carbs_g,
+          daily_fat_g: goals.daily_fat_g,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', nutritionGoals.value.id)
+        .eq('user_id', user.value.id)
+        .select()
+        .single()
 
-    if (error) throw error
+      if (error) throw error
 
-    nutritionGoals.value = data
-    return data
+      nutritionGoals.value = data
+      return data
+    } else {
+      // Insert new goals
+      const { data, error } = await $supabase
+        .from('nutrition_goals')
+        .insert({
+          user_id: user.value.id,
+          daily_calories: goals.daily_calories,
+          daily_protein_g: goals.daily_protein_g,
+          daily_carbs_g: goals.daily_carbs_g,
+          daily_fat_g: goals.daily_fat_g,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      nutritionGoals.value = data
+      return data
+    }
   }
 
   // Fetch food entries for a specific date
