@@ -36,6 +36,17 @@ export default defineEventHandler(async (event) => {
 
   const supabase = createClient(config.public.supabaseUrl, config.supabaseServiceKey)
 
+  // Check if event was already processed (idempotency)
+  const { data: existingEvent } = await supabase
+    .from('subscription_events')
+    .select('id')
+    .eq('stripe_event_id', stripeEvent.id)
+    .maybeSingle()
+
+  if (existingEvent) {
+    return { received: true, message: 'Event already processed' }
+  }
+
   // Helper to log subscription event
   async function logEvent(userId: string, eventType: string, subscriptionId?: string) {
     await supabase.from('subscription_events').insert({

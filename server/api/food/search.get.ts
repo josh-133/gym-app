@@ -54,7 +54,7 @@ export default defineEventHandler(async (event) => {
         return (
           p.product_name &&
           p.nutriments &&
-          (p.nutriments['energy-kcal_100g'] !== undefined || p.nutriments['energy-kcal_100g'] !== null)
+          p.nutriments['energy-kcal_100g'] != null
         )
       })
       .map((p) => ({

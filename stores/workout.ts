@@ -1,6 +1,19 @@
 import { defineStore } from 'pinia'
 import type { WorkoutSession, ExerciseLog, Set, Exercise, CardioLog } from '~/types/database'
 
+const STORAGE_KEY = 'gym-app-active-workout'
+
+interface PersistedState {
+  session: WorkoutSession | null
+  exerciseLogs: ActiveExerciseLog[]
+  isActive: boolean
+  isPaused: boolean
+  startedAt: string | null
+  pausedAt: string | null
+  totalPausedTime: number
+  restTimerEndAt: string | null
+}
+
 interface ActiveSet {
   set_number: number
   reps: number | null
@@ -101,12 +114,14 @@ export const useWorkoutStore = defineStore('workout', {
       this.pausedAt = null
       this.totalPausedTime = 0
       this.restTimerEndAt = null
+      this.persistState()
     },
 
     pauseWorkout() {
       if (this.isActive && !this.isPaused) {
         this.isPaused = true
         this.pausedAt = new Date()
+        this.persistState()
       }
     },
 
@@ -115,6 +130,7 @@ export const useWorkoutStore = defineStore('workout', {
         this.totalPausedTime += Date.now() - this.pausedAt.getTime()
         this.isPaused = false
         this.pausedAt = null
+        this.persistState()
       }
     },
 
@@ -128,6 +144,7 @@ export const useWorkoutStore = defineStore('workout', {
         notes: '',
       }
       this.exerciseLogs.push(log)
+      this.persistState()
     },
 
     removeExercise(index: number) {
@@ -135,6 +152,7 @@ export const useWorkoutStore = defineStore('workout', {
       this.exerciseLogs.forEach((log, i) => {
         log.order_index = i
       })
+      this.persistState()
     },
 
     addSet(exerciseIndex: number) {
@@ -152,6 +170,7 @@ export const useWorkoutStore = defineStore('workout', {
         is_pr: false,
       }
       log.sets.push(newSet)
+      this.persistState()
     },
 
     completeSet(exerciseIndex: number, setIndex: number, data: Partial<ActiveSet>) {
@@ -163,6 +182,7 @@ export const useWorkoutStore = defineStore('workout', {
         ...data,
         completed_at: new Date().toISOString(),
       }
+      this.persistState()
     },
 
     updateSet(exerciseIndex: number, setIndex: number, data: Partial<ActiveSet>) {
@@ -173,6 +193,7 @@ export const useWorkoutStore = defineStore('workout', {
         ...log.sets[setIndex],
         ...data,
       }
+      this.persistState()
     },
 
     removeSet(exerciseIndex: number, setIndex: number) {
@@ -183,6 +204,7 @@ export const useWorkoutStore = defineStore('workout', {
       log.sets.forEach((set, i) => {
         set.set_number = i + 1
       })
+      this.persistState()
     },
 
     uncompleteSet(exerciseIndex: number, setIndex: number) {
@@ -193,6 +215,7 @@ export const useWorkoutStore = defineStore('workout', {
         ...log.sets[setIndex],
         completed_at: null,
       }
+      this.persistState()
     },
 
     updateCardioLog(exerciseIndex: number, data: Partial<CardioLog>) {
@@ -205,6 +228,7 @@ export const useWorkoutStore = defineStore('workout', {
       }
 
       log.cardio_log = { ...log.cardio_log, ...data }
+      this.persistState()
     },
 
     completeCardioLog(exerciseIndex: number) {
@@ -215,14 +239,17 @@ export const useWorkoutStore = defineStore('workout', {
         ...log.cardio_log,
         completed_at: new Date().toISOString(),
       }
+      this.persistState()
     },
 
     startRestTimer(seconds: number) {
       this.restTimerEndAt = new Date(Date.now() + seconds * 1000)
+      this.persistState()
     },
 
     cancelRestTimer() {
       this.restTimerEndAt = null
+      this.persistState()
     },
 
     async endWorkout() {
@@ -248,6 +275,7 @@ export const useWorkoutStore = defineStore('workout', {
       this.pausedAt = null
       this.totalPausedTime = 0
       this.restTimerEndAt = null
+      this.clearPersisted()
 
       return { session: completedSession, exerciseLogs: completedLogs }
     },
@@ -261,6 +289,65 @@ export const useWorkoutStore = defineStore('workout', {
       this.pausedAt = null
       this.totalPausedTime = 0
       this.restTimerEndAt = null
+      this.clearPersisted()
+    },
+
+    persistState() {
+      if (typeof window === 'undefined') return
+
+      const state: PersistedState = {
+        session: this.session,
+        exerciseLogs: this.exerciseLogs,
+        isActive: this.isActive,
+        isPaused: this.isPaused,
+        startedAt: this.startedAt?.toISOString() ?? null,
+        pausedAt: this.pausedAt?.toISOString() ?? null,
+        totalPausedTime: this.totalPausedTime,
+        restTimerEndAt: this.restTimerEndAt?.toISOString() ?? null,
+      }
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      } catch (e) {
+        console.error('Failed to persist workout state:', e)
+      }
+    },
+
+    restoreState() {
+      if (typeof window === 'undefined') return false
+
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY)
+        if (!stored) return false
+
+        const state: PersistedState = JSON.parse(stored)
+
+        // Only restore if there was an active workout
+        if (!state.isActive || !state.session) {
+          this.clearPersisted()
+          return false
+        }
+
+        this.session = state.session
+        this.exerciseLogs = state.exerciseLogs
+        this.isActive = state.isActive
+        this.isPaused = state.isPaused
+        this.startedAt = state.startedAt ? new Date(state.startedAt) : null
+        this.pausedAt = state.pausedAt ? new Date(state.pausedAt) : null
+        this.totalPausedTime = state.totalPausedTime
+        this.restTimerEndAt = state.restTimerEndAt ? new Date(state.restTimerEndAt) : null
+
+        return true
+      } catch (e) {
+        console.error('Failed to restore workout state:', e)
+        this.clearPersisted()
+        return false
+      }
+    },
+
+    clearPersisted() {
+      if (typeof window === 'undefined') return
+      localStorage.removeItem(STORAGE_KEY)
     },
   },
 })

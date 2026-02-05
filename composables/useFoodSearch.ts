@@ -56,8 +56,15 @@ export function useFoodSearch() {
   const searching = useState('foodSearching', () => false)
   const searchError = useState<string | null>('foodSearchError', () => null)
 
-  // Debounce timer
-  let searchTimeout: ReturnType<typeof setTimeout> | null = null
+  // Debounce timer - use ref for proper cleanup
+  const searchTimeoutRef = ref<ReturnType<typeof setTimeout> | null>(null)
+
+  function clearSearchTimeout() {
+    if (searchTimeoutRef.value) {
+      clearTimeout(searchTimeoutRef.value)
+      searchTimeoutRef.value = null
+    }
+  }
 
   // Search Open Food Facts API via server route
   async function searchFoods(query: string) {
@@ -67,11 +74,9 @@ export function useFoodSearch() {
     }
 
     // Debounce search
-    if (searchTimeout) {
-      clearTimeout(searchTimeout)
-    }
+    clearSearchTimeout()
 
-    searchTimeout = setTimeout(async () => {
+    searchTimeoutRef.value = setTimeout(async () => {
       searching.value = true
       searchError.value = null
 
@@ -87,6 +92,7 @@ export function useFoodSearch() {
         searchResults.value = []
       } finally {
         searching.value = false
+        searchTimeoutRef.value = null
       }
     }, 300)
   }
@@ -114,9 +120,19 @@ export function useFoodSearch() {
   function clearSearch() {
     searchResults.value = []
     searchError.value = null
-    if (searchTimeout) {
-      clearTimeout(searchTimeout)
-    }
+    clearSearchTimeout()
+  }
+
+  // Cleanup function for components to call on unmount
+  function cleanup() {
+    clearSearchTimeout()
+  }
+
+  // Auto-cleanup on scope disposal (when used in components with onUnmounted)
+  if (typeof onScopeDispose !== 'undefined') {
+    onScopeDispose(() => {
+      clearSearchTimeout()
+    })
   }
 
   // Fetch user's custom foods
@@ -346,5 +362,8 @@ export function useFoodSearch() {
     customFoodToSearchResult,
     favoriteFoods,
     calculateNutrition,
+
+    // Cleanup
+    cleanup,
   }
 }

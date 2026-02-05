@@ -20,7 +20,14 @@ const presets = [
 
 // Current remaining time
 const remainingSeconds = ref(0)
-let interval: ReturnType<typeof setInterval> | null = null
+const intervalRef = ref<ReturnType<typeof setInterval> | null>(null)
+
+function clearIntervalSafe() {
+  if (intervalRef.value) {
+    clearInterval(intervalRef.value)
+    intervalRef.value = null
+  }
+}
 
 function startTimer(seconds: number) {
   workoutStore.startRestTimer(seconds)
@@ -28,12 +35,10 @@ function startTimer(seconds: number) {
   showTimerModal.value = false
 
   // Clear any existing interval
-  if (interval) {
-    clearInterval(interval)
-  }
+  clearIntervalSafe()
 
   // Start countdown
-  interval = setInterval(() => {
+  intervalRef.value = setInterval(() => {
     remainingSeconds.value = workoutStore.restTimerRemaining
 
     // Play warning beep at 5 seconds
@@ -47,10 +52,7 @@ function startTimer(seconds: number) {
 
     // Timer complete
     if (remainingSeconds.value <= 0) {
-      if (interval) {
-        clearInterval(interval)
-        interval = null
-      }
+      clearIntervalSafe()
       playCompletionAlert()
       workoutStore.cancelRestTimer()
     }
@@ -58,10 +60,7 @@ function startTimer(seconds: number) {
 }
 
 function cancelTimer() {
-  if (interval) {
-    clearInterval(interval)
-    interval = null
-  }
+  clearIntervalSafe()
   workoutStore.cancelRestTimer()
   remainingSeconds.value = 0
 }
@@ -82,9 +81,7 @@ const progressPercent = computed(() => {
 })
 
 onUnmounted(() => {
-  if (interval) {
-    clearInterval(interval)
-  }
+  clearIntervalSafe()
 })
 
 // Expose start timer for parent components

@@ -31,6 +31,15 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  // Validate barcode format (UPC-A: 12, UPC-E: 8, EAN-13: 13, EAN-8: 8)
+  // Allow 8-14 digits to cover most formats including ISBN
+  if (!/^\d{8,14}$/.test(barcode)) {
+    throw createError({
+      statusCode: 400,
+      message: 'Invalid barcode format. Expected 8-14 digits.',
+    })
+  }
+
   try {
     const response = await $fetch<OpenFoodFactsBarcodeResponse>(
       `https://world.openfoodfacts.org/api/v2/product/${barcode}`,

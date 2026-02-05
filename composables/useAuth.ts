@@ -1,12 +1,15 @@
 import type { User, Session } from '@supabase/supabase-js'
 import type { Profile } from '~/types/database'
 
+let authSubscription: { unsubscribe: () => void } | null = null
+
 export function useAuth() {
   const { $supabase } = useNuxtApp()
   const user = useState<User | null>('user', () => null)
   const session = useState<Session | null>('session', () => null)
   const profile = useState<Profile | null>('profile', () => null)
   const loading = useState('authLoading', () => true)
+  const initialized = useState('authInitialized', () => false)
 
   const isAuthenticated = computed(() => !!user.value)
 
@@ -16,9 +19,9 @@ export function useAuth() {
       return
     }
 
-    // If already initialized and we have a user, just ensure profile is loaded
-    if (!loading.value && user.value) {
-      if (!profile.value) {
+    // If already initialized, just ensure profile is loaded
+    if (initialized.value) {
+      if (user.value && !profile.value) {
         await fetchProfile()
       }
       loading.value = false
@@ -26,18 +29,20 @@ export function useAuth() {
     }
 
     try {
-      // First, set up the auth state change listener
-      // This is important because it helps catch the session from storage
-      const { data: { subscription } } = $supabase.auth.onAuthStateChange(async (event, newSession) => {
-        session.value = newSession
-        user.value = newSession?.user ?? null
+      // Only set up subscription once to prevent memory leaks
+      if (!authSubscription) {
+        const { data: { subscription } } = $supabase.auth.onAuthStateChange(async (event, newSession) => {
+          session.value = newSession
+          user.value = newSession?.user ?? null
 
-        if (event === 'SIGNED_IN' && newSession) {
-          await fetchProfile()
-        } else if (event === 'SIGNED_OUT') {
-          profile.value = null
-        }
-      })
+          if (event === 'SIGNED_IN' && newSession) {
+            await fetchProfile()
+          } else if (event === 'SIGNED_OUT') {
+            profile.value = null
+          }
+        })
+        authSubscription = subscription
+      }
 
       // Then get the current session
       const { data: { session: currentSession } } = await $supabase.auth.getSession()
@@ -46,9 +51,19 @@ export function useAuth() {
         user.value = currentSession.user
         await fetchProfile()
       }
+
+      initialized.value = true
     } finally {
       loading.value = false
     }
+  }
+
+  function cleanup() {
+    if (authSubscription) {
+      authSubscription.unsubscribe()
+      authSubscription = null
+    }
+    initialized.value = false
   }
 
   async function fetchProfile() {
@@ -156,6 +171,7 @@ export function useAuth() {
     loading,
     isAuthenticated,
     initialize,
+    cleanup,
     signUp,
     signIn,
     signInWithGoogle,

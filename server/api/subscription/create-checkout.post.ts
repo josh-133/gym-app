@@ -26,20 +26,31 @@ export default defineEventHandler(async (event) => {
   let customerId = profile?.stripe_customer_id
 
   if (!customerId) {
+    // Use idempotency key to prevent duplicate customers from race conditions
     const customer = await stripe.customers.create({
       email: user.email,
       metadata: {
         supabase_user_id: user.id,
         username: profile?.username || '',
       },
+    }, {
+      idempotencyKey: `create-customer-${user.id}`,
     })
     customerId = customer.id
 
     // Save customer ID to profile
-    await supabase
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({ stripe_customer_id: customerId })
       .eq('id', user.id)
+
+    if (updateError) {
+      console.error('Failed to save Stripe customer ID:', updateError)
+      throw createError({
+        statusCode: 500,
+        message: 'Failed to link payment account',
+      })
+    }
   }
 
   // Get the request URL for success/cancel redirects
