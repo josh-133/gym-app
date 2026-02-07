@@ -6,6 +6,7 @@ definePageMeta({
 })
 
 const router = useRouter()
+const notification = useNotification()
 
 const {
   nutritionGoals,
@@ -14,8 +15,13 @@ const {
   saveNutritionGoals,
 } = useNutrition()
 
-// Form state
-const form = ref({
+// Form state (values can be null when user clears input)
+const form = ref<{
+  daily_calories: number | null
+  daily_protein_g: number | null
+  daily_carbs_g: number | null
+  daily_fat_g: number | null
+}>({
   daily_calories: 2000,
   daily_protein_g: 150,
   daily_carbs_g: 200,
@@ -90,32 +96,64 @@ function applyPreset(preset: typeof presets[0]) {
 
 // Calculate total calories from macros
 const calculatedCalories = computed(() => {
-  return (
-    form.value.daily_protein_g * 4 +
-    form.value.daily_carbs_g * 4 +
-    form.value.daily_fat_g * 9
-  )
+  const protein = form.value.daily_protein_g || 0
+  const carbs = form.value.daily_carbs_g || 0
+  const fat = form.value.daily_fat_g || 0
+  return protein * 4 + carbs * 4 + fat * 9
 })
 
 // Macro percentages
 const macroPercentages = computed(() => {
   const total = calculatedCalories.value
   if (total === 0) return { protein: 0, carbs: 0, fat: 0 }
+  const protein = form.value.daily_protein_g || 0
+  const carbs = form.value.daily_carbs_g || 0
+  const fat = form.value.daily_fat_g || 0
   return {
-    protein: Math.round((form.value.daily_protein_g * 4 / total) * 100),
-    carbs: Math.round((form.value.daily_carbs_g * 4 / total) * 100),
-    fat: Math.round((form.value.daily_fat_g * 9 / total) * 100),
+    protein: Math.round((protein * 4 / total) * 100),
+    carbs: Math.round((carbs * 4 / total) * 100),
+    fat: Math.round((fat * 9 / total) * 100),
   }
 })
 
+// Validate form
+function validateForm(): boolean {
+  if (!form.value.daily_calories || form.value.daily_calories < 1000) {
+    notification.error('Please set a valid calorie goal (minimum 1000)')
+    return false
+  }
+  if (form.value.daily_protein_g == null || form.value.daily_protein_g < 0) {
+    notification.error('Please set a valid protein goal')
+    return false
+  }
+  if (form.value.daily_carbs_g == null || form.value.daily_carbs_g < 0) {
+    notification.error('Please set a valid carbs goal')
+    return false
+  }
+  if (form.value.daily_fat_g == null || form.value.daily_fat_g < 0) {
+    notification.error('Please set a valid fat goal')
+    return false
+  }
+  return true
+}
+
 // Save goals
 async function handleSave() {
+  if (!validateForm()) return
+
   saving.value = true
   try {
-    await saveNutritionGoals(form.value)
+    await saveNutritionGoals({
+      daily_calories: form.value.daily_calories!,
+      daily_protein_g: form.value.daily_protein_g!,
+      daily_carbs_g: form.value.daily_carbs_g!,
+      daily_fat_g: form.value.daily_fat_g!,
+    })
+    notification.success('Nutrition goals saved!')
     router.push('/nutrition')
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error saving nutrition goals:', err)
+    notification.error(err?.message || 'Failed to save nutrition goals')
   } finally {
     saving.value = false
   }
@@ -206,7 +244,7 @@ async function handleSave() {
             <div class="flex items-center justify-between mb-2">
               <label class="font-medium text-gray-700 dark:text-gray-300">Protein</label>
               <span class="text-sm text-gray-500 dark:text-gray-400">
-                {{ macroPercentages.protein }}% · {{ form.daily_protein_g * 4 }} cal
+                {{ macroPercentages.protein }}% · {{ (form.daily_protein_g || 0) * 4 }} cal
               </span>
             </div>
             <NInputNumber
@@ -228,7 +266,7 @@ async function handleSave() {
             <div class="flex items-center justify-between mb-2">
               <label class="font-medium text-gray-700 dark:text-gray-300">Carbohydrates</label>
               <span class="text-sm text-gray-500 dark:text-gray-400">
-                {{ macroPercentages.carbs }}% · {{ form.daily_carbs_g * 4 }} cal
+                {{ macroPercentages.carbs }}% · {{ (form.daily_carbs_g || 0) * 4 }} cal
               </span>
             </div>
             <NInputNumber
@@ -250,7 +288,7 @@ async function handleSave() {
             <div class="flex items-center justify-between mb-2">
               <label class="font-medium text-gray-700 dark:text-gray-300">Fat</label>
               <span class="text-sm text-gray-500 dark:text-gray-400">
-                {{ macroPercentages.fat }}% · {{ form.daily_fat_g * 9 }} cal
+                {{ macroPercentages.fat }}% · {{ (form.daily_fat_g || 0) * 9 }} cal
               </span>
             </div>
             <NInputNumber
