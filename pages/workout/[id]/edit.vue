@@ -13,6 +13,8 @@ const { workouts, getWorkout, updateWorkout, loadWorkouts } = useWorkoutHistory(
 // Get workout ID from route - computed to ensure reactivity
 const workoutId = computed(() => route.params.id as string)
 
+type SetType = 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
+
 // Form state
 const workoutName = ref('')
 const workoutDate = ref<number>(Date.now())
@@ -25,6 +27,8 @@ const exercises = ref<{
     weight: number | null
     reps: number | null
     completed: boolean
+    set_type?: SetType
+    rpe?: number | null
   }[]
 }[]>([])
 
@@ -57,6 +61,8 @@ function loadWorkoutData() {
         weight: set.weight,
         reps: set.reps,
         completed: set.completed,
+        set_type: set.set_type,
+        rpe: set.rpe,
       })),
     }))
     dataLoaded.value = true
@@ -124,13 +130,54 @@ function removeExercise(index: number) {
   exercises.value.splice(index, 1)
 }
 
-function addSet(exerciseIndex: number) {
+function addSet(exerciseIndex: number, setType: SetType = 'working') {
   const lastSet = exercises.value[exerciseIndex].sets.at(-1)
   exercises.value[exerciseIndex].sets.push({
     weight: lastSet?.weight || null,
     reps: lastSet?.reps || null,
     completed: true,
+    set_type: setType,
+    rpe: null,
   })
+}
+
+function addDropSet(exerciseIndex: number) {
+  const lastSet = exercises.value[exerciseIndex].sets.at(-1)
+  const reducedWeight = lastSet?.weight
+    ? Math.round(lastSet.weight * 0.75 * 2) / 2 // 75% weight, rounded to 0.5
+    : null
+
+  exercises.value[exerciseIndex].sets.push({
+    weight: reducedWeight,
+    reps: lastSet?.reps || null,
+    completed: true,
+    set_type: 'dropset',
+    rpe: null,
+  })
+}
+
+function isDropSet(setType?: SetType): boolean {
+  return setType === 'dropset'
+}
+
+function getSetTypeLabel(type?: SetType): string {
+  switch (type) {
+    case 'warmup': return 'W'
+    case 'dropset': return 'D'
+    case 'failure': return 'F'
+    case 'amrap': return 'A'
+    default: return ''
+  }
+}
+
+function getSetTypeBadgeClass(type?: SetType): string {
+  switch (type) {
+    case 'warmup': return 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+    case 'dropset': return 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+    case 'failure': return 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+    case 'amrap': return 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
+    default: return ''
+  }
 }
 
 function removeSet(exerciseIndex: number, setIndex: number) {
@@ -360,10 +407,19 @@ function formatMuscleGroups(groups: string[]) {
             <div
               v-for="(set, setIndex) in exercise.sets"
               :key="setIndex"
-              class="grid grid-cols-12 gap-2 items-center"
+              class="grid grid-cols-12 gap-2 items-center rounded-lg p-1 transition-colors"
+              :class="isDropSet(set.set_type) ? 'bg-amber-50/50 dark:bg-amber-900/10 ml-3 border-l-2 border-amber-400' : ''"
             >
-              <div class="col-span-2 text-center font-medium text-gray-700 dark:text-gray-300">
-                {{ setIndex + 1 }}
+              <div class="col-span-2 text-center font-medium text-gray-700 dark:text-gray-300 flex items-center justify-center gap-1">
+                <span>{{ setIndex + 1 }}</span>
+                <span
+                  v-if="getSetTypeLabel(set.set_type)"
+                  class="w-4 h-4 text-xs font-bold rounded flex items-center justify-center"
+                  :class="getSetTypeBadgeClass(set.set_type)"
+                  :title="set.set_type"
+                >
+                  {{ getSetTypeLabel(set.set_type) }}
+                </span>
               </div>
               <div class="col-span-4">
                 <NInputNumber
@@ -398,14 +454,27 @@ function formatMuscleGroups(groups: string[]) {
               </div>
             </div>
 
-            <NButton size="small" dashed block @click="addSet(exIndex)">
-              <template #icon>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                </svg>
-              </template>
-              Add Set
-            </NButton>
+            <div class="flex gap-2">
+              <NButton size="small" dashed class="flex-1" @click="addSet(exIndex)">
+                <template #icon>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                </template>
+                Add Set
+              </NButton>
+              <NButton
+                size="small"
+                dashed
+                class="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                @click="addDropSet(exIndex)"
+              >
+                <template #icon>
+                  <span class="font-bold">D</span>
+                </template>
+                Drop Set
+              </NButton>
+            </div>
           </div>
         </NCard>
       </div>

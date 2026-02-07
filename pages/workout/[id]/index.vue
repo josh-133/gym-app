@@ -22,6 +22,9 @@ interface CardioData {
   completed: boolean
 }
 
+// Set type definition
+type SetType = 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
+
 // Workout data from history
 interface WorkoutData {
   id: string
@@ -40,7 +43,8 @@ interface WorkoutData {
       set_number: number
       weight: number | null
       reps: number | null
-      type: string
+      type: SetType
+      rpe?: number | null
       is_pr?: boolean
     }[]
     cardio?: CardioData
@@ -115,7 +119,8 @@ onMounted(async () => {
           set_number: index + 1,
           weight: set.weight,
           reps: set.reps,
-          type: 'working',
+          type: (set.set_type || 'working') as SetType,
+          rpe: set.rpe,
           is_pr: false,
         })),
         cardio: ex.cardio,
@@ -212,8 +217,24 @@ function getSetTypeColor(type: string) {
     case 'working': return 'info'
     case 'dropset': return 'warning'
     case 'failure': return 'error'
+    case 'amrap': return 'success'
     default: return 'default'
   }
+}
+
+function getSetTypeLabel(type: string): string {
+  switch (type) {
+    case 'warmup': return 'Warm-up'
+    case 'working': return 'Working'
+    case 'dropset': return 'Drop Set'
+    case 'failure': return 'Failure'
+    case 'amrap': return 'AMRAP'
+    default: return type
+  }
+}
+
+function isDropSet(type: string): boolean {
+  return type === 'dropset'
 }
 
 // Convert exercise name to Exercise type for workout store
@@ -448,20 +469,28 @@ function repeatWorkout() {
                   v-for="set in exercise.sets"
                   :key="set.set_number"
                   class="border-t border-gray-100 dark:border-gray-700"
+                  :class="isDropSet(set.type) ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''"
                 >
-                  <td class="py-2 font-medium text-gray-900 dark:text-white">{{ set.set_number }}</td>
+                  <td class="py-2 font-medium text-gray-900 dark:text-white" :class="isDropSet(set.type) ? 'pl-4' : ''">
+                    {{ set.set_number }}
+                  </td>
                   <td class="py-2">
-                    <NTag :type="getSetTypeColor(set.type)" size="small">{{ set.type }}</NTag>
+                    <NTag :type="getSetTypeColor(set.type)" size="small">{{ getSetTypeLabel(set.type) }}</NTag>
                   </td>
                   <td class="py-2 text-gray-900 dark:text-white">{{ convertWeight(set.weight) }} {{ weightUnit }}</td>
                   <td class="py-2 text-gray-900 dark:text-white">{{ set.reps }}</td>
                   <td class="py-2">
-                    <span v-if="set.is_pr" class="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400 text-sm font-medium">
-                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                      </svg>
-                      PR
-                    </span>
+                    <div class="flex items-center gap-2">
+                      <span v-if="set.rpe" class="text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                        @{{ set.rpe }}
+                      </span>
+                      <span v-if="set.is_pr" class="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        PR
+                      </span>
+                    </div>
                   </td>
                 </tr>
               </tbody>

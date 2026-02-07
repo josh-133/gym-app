@@ -155,7 +155,7 @@ export const useWorkoutStore = defineStore('workout', {
       this.persistState()
     },
 
-    addSet(exerciseIndex: number) {
+    addSet(exerciseIndex: number, setType: ActiveSet['set_type'] = 'working') {
       const log = this.exerciseLogs[exerciseIndex]
       if (!log) return
 
@@ -165,7 +165,29 @@ export const useWorkoutStore = defineStore('workout', {
         reps: lastSet?.reps ?? null,
         weight_kg: lastSet?.weight_kg ?? null,
         rpe: null,
-        set_type: 'working',
+        set_type: setType,
+        completed_at: null,
+        is_pr: false,
+      }
+      log.sets.push(newSet)
+      this.persistState()
+    },
+
+    addDropSet(exerciseIndex: number, weightReduction: number = 0.75) {
+      const log = this.exerciseLogs[exerciseIndex]
+      if (!log) return
+
+      const lastSet = log.sets[log.sets.length - 1]
+      const reducedWeight = lastSet?.weight_kg
+        ? Math.round(lastSet.weight_kg * weightReduction * 2) / 2 // Round to nearest 0.5
+        : null
+
+      const newSet: ActiveSet = {
+        set_number: log.sets.length + 1,
+        reps: lastSet?.reps ?? null,
+        weight_kg: reducedWeight,
+        rpe: null,
+        set_type: 'dropset',
         completed_at: null,
         is_pr: false,
       }

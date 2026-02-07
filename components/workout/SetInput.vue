@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { NInputNumber } from 'naive-ui'
 
+type SetType = 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
+
 interface SetData {
   set_number: number
   reps: number | null
   weight_kg: number | null
   rpe: number | null
-  set_type: string
+  set_type: SetType | string
   completed_at: string | null
   is_pr: boolean
 }
@@ -22,6 +24,10 @@ const props = defineProps<{
   exerciseIndex: number
   exerciseName: string
   previousSets?: PreviousSet[]
+}>()
+
+const emit = defineEmits<{
+  addDropSet: []
 }>()
 
 const workoutStore = useWorkoutStore()
@@ -57,6 +63,29 @@ const rpe = ref<number | null>(props.set.rpe)
 const isCompleted = ref(!!props.set.completed_at)
 const isBodyweight = ref(props.set.weight_kg === 0)
 const showRpeSelector = ref(false)
+const showSetTypeSelector = ref(false)
+const currentSetType = ref<SetType>((props.set.set_type as SetType) || 'working')
+
+// Set type configuration
+const setTypeConfig: Record<SetType, { label: string; badge: string; color: string }> = {
+  warmup: { label: 'Warm-up', badge: 'W', color: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' },
+  working: { label: 'Working', badge: '', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' },
+  dropset: { label: 'Drop Set', badge: 'D', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+  failure: { label: 'Failure', badge: 'F', color: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' },
+  amrap: { label: 'AMRAP', badge: 'A', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
+}
+
+const isDropSet = computed(() => currentSetType.value === 'dropset')
+
+function changeSetType(newType: SetType) {
+  currentSetType.value = newType
+  showSetTypeSelector.value = false
+  workoutStore.updateSet(props.exerciseIndex, props.setIndex, { set_type: newType })
+}
+
+function handleAddDropSet() {
+  emit('addDropSet')
+}
 
 // RPE descriptions
 const rpeDescriptions: Record<number, string> = {
@@ -120,11 +149,51 @@ function removeSet() {
 <template>
   <div
     class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2 items-center p-2 rounded-lg transition-colors"
-    :class="isCompleted ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800/50'"
+    :class="[
+      isCompleted
+        ? isDropSet
+          ? 'bg-amber-50 dark:bg-amber-900/20 border-l-2 border-amber-400'
+          : 'bg-green-50 dark:bg-green-900/20'
+        : isDropSet
+          ? 'bg-amber-50/50 dark:bg-amber-900/10 border-l-2 border-amber-300'
+          : 'bg-gray-50 dark:bg-gray-800/50',
+      isDropSet ? 'ml-4' : ''
+    ]"
   >
-    <!-- Set Number -->
-    <div class="col-span-1 text-center font-medium text-gray-500 dark:text-gray-400">
-      {{ set.set_number }}
+    <!-- Set Number with Type Badge -->
+    <div class="col-span-1 text-center font-medium text-gray-500 dark:text-gray-400 relative">
+      <div class="flex items-center justify-center gap-1">
+        <span>{{ set.set_number }}</span>
+        <button
+          v-if="setTypeConfig[currentSetType].badge"
+          class="w-4 h-4 text-xs font-bold rounded flex items-center justify-center"
+          :class="setTypeConfig[currentSetType].color"
+          :title="setTypeConfig[currentSetType].label"
+          @click.stop="showSetTypeSelector = !showSetTypeSelector"
+        >
+          {{ setTypeConfig[currentSetType].badge }}
+        </button>
+      </div>
+
+      <!-- Set Type Selector Dropdown -->
+      <div
+        v-if="showSetTypeSelector"
+        class="absolute left-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-1 min-w-[120px]"
+      >
+        <button
+          v-for="(config, type) in setTypeConfig"
+          :key="type"
+          class="w-full px-2 py-1.5 text-left text-sm rounded hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+          :class="currentSetType === type ? config.color : 'text-gray-700 dark:text-gray-300'"
+          @click="changeSetType(type as SetType)"
+        >
+          <span v-if="config.badge" class="w-4 h-4 text-xs font-bold rounded flex items-center justify-center" :class="config.color">
+            {{ config.badge }}
+          </span>
+          <span v-else class="w-4"></span>
+          <span>{{ config.label }}</span>
+        </button>
+      </div>
     </div>
 
     <!-- Previous (hidden on smallest screens) -->
@@ -219,6 +288,16 @@ function removeSet() {
           <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
         </svg>
       </span>
+
+      <!-- Add Drop Set Button (shows after set is completed and not already a dropset) -->
+      <button
+        v-if="isCompleted && currentSetType === 'working'"
+        class="px-1.5 py-0.5 rounded text-xs font-medium transition-colors bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/50"
+        @click="handleAddDropSet"
+        title="Add drop set with reduced weight"
+      >
+        +D
+      </button>
 
       <button
         class="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"

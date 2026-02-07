@@ -17,6 +17,8 @@ interface SavedWorkout {
       weight: number | null
       reps: number | null
       completed: boolean
+      set_type?: 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
+      rpe?: number | null
     }[]
     cardio?: CardioData
   }[]

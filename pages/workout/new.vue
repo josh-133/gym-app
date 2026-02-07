@@ -246,6 +246,8 @@ async function confirmFinishWorkout() {
           weight: set.weight_kg,
           reps: set.reps,
           completed: !!set.completed_at,
+          set_type: set.set_type,
+          rpe: set.rpe,
         })),
         cardio: log.cardio_log ? {
           duration_sec: log.cardio_log.duration_sec || 0,
@@ -571,6 +573,7 @@ onMounted(() => {
                 :exercise-index="index"
                 :exercise-name="log.exercise.name"
                 :previous-sets="getLastPerformedSets(log.exercise.name)"
+                @add-drop-set="workoutStore.addDropSet(index)"
               />
 
               <!-- Add Set Button -->
