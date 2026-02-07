@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { NCard, NButton, NInput, NInputNumber, NDatePicker, NModal, NEmpty } from 'naive-ui'
-import { EXERCISE_LIBRARY } from '~/utils/exercises'
+import { EXERCISE_LIBRARY, type CardioTrackingType, type ExerciseCategory } from '~/utils/exercises'
+import CardioInput from '~/components/workout/CardioInput.vue'
 
 definePageMeta({
   middleware: ['auth'],
@@ -15,14 +16,10 @@ const workoutId = computed(() => route.params.id as string)
 
 type SetType = 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
 
-// Form state
-const workoutName = ref('')
-const workoutDate = ref<number>(Date.now())
-const durationHours = ref(0)
-const durationMinutes = ref(0)
-const workoutNotes = ref<string | null>(null)
-const exercises = ref<{
+interface ExerciseData {
   name: string
+  category: ExerciseCategory
+  trackingType?: CardioTrackingType
   sets: {
     weight: number | null
     reps: number | null
@@ -30,7 +27,21 @@ const exercises = ref<{
     set_type?: SetType
     rpe?: number | null
   }[]
-}[]>([])
+  cardio?: {
+    duration_sec: number | null
+    distance_km: number | null
+    calories: number | null
+    completed: boolean
+  }
+}
+
+// Form state
+const workoutName = ref('')
+const workoutDate = ref<number>(Date.now())
+const durationHours = ref(0)
+const durationMinutes = ref(0)
+const workoutNotes = ref<string | null>(null)
+const exercises = ref<ExerciseData[]>([])
 
 const loading = ref(true)
 const saving = ref(false)
@@ -55,16 +66,31 @@ function loadWorkoutData() {
     durationHours.value = Math.floor(savedWorkout.duration / 3600)
     durationMinutes.value = Math.floor((savedWorkout.duration % 3600) / 60)
     workoutNotes.value = savedWorkout.notes
-    exercises.value = savedWorkout.exercises.map(ex => ({
-      name: ex.name,
-      sets: ex.sets.map(set => ({
-        weight: set.weight,
-        reps: set.reps,
-        completed: set.completed,
-        set_type: set.set_type,
-        rpe: set.rpe,
-      })),
-    }))
+    exercises.value = savedWorkout.exercises.map(ex => {
+      // Look up exercise in library to get category and tracking type
+      const libraryExercise = EXERCISE_LIBRARY.find(e => e.name === ex.name)
+      const category = ex.category || libraryExercise?.category || 'strength'
+      const trackingType = libraryExercise?.trackingType
+
+      return {
+        name: ex.name,
+        category: category as ExerciseCategory,
+        trackingType,
+        sets: ex.sets.map(set => ({
+          weight: set.weight,
+          reps: set.reps,
+          completed: set.completed,
+          set_type: set.set_type,
+          rpe: set.rpe,
+        })),
+        cardio: ex.cardio ? {
+          duration_sec: ex.cardio.duration_sec || null,
+          distance_km: ex.cardio.distance_km || null,
+          calories: ex.cardio.calories || null,
+          completed: ex.cardio.completed || false,
+        } : undefined,
+      }
+    })
     dataLoaded.value = true
     loading.value = false
   }
@@ -104,7 +130,9 @@ const availableExercises = computed(() => {
     .map(ex => ({
       id: ex.id,
       name: ex.name,
+      category: ex.category,
       muscleGroups: ex.muscleGroups,
+      trackingType: ex.trackingType,
     }))
 })
 
@@ -117,10 +145,20 @@ const filteredExercises = computed(() => {
   )
 })
 
-function addExercise(exercise: { name: string }) {
+function addExercise(exercise: { name: string; category: ExerciseCategory; trackingType?: CardioTrackingType }) {
+  const isCardio = exercise.category === 'cardio'
+
   exercises.value.push({
     name: exercise.name,
-    sets: [{ weight: null, reps: null, completed: true }],
+    category: exercise.category,
+    trackingType: exercise.trackingType,
+    sets: isCardio ? [] : [{ weight: null, reps: null, completed: true }],
+    cardio: isCardio ? {
+      duration_sec: null,
+      distance_km: null,
+      calories: null,
+      completed: false,
+    } : undefined,
   })
   showExercisePicker.value = false
   exerciseSearch.value = ''
@@ -202,9 +240,34 @@ function moveExerciseDown(index: number) {
   }
 }
 
-// Calculate volume
+// Handle cardio updates
+function handleCardioUpdate(exerciseIndex: number, data: { duration_sec: number | null; distance_km: number | null; calories: number | null }) {
+  const exercise = exercises.value[exerciseIndex]
+  if (!exercise || !exercise.cardio) return
+
+  exercise.cardio = {
+    ...exercise.cardio,
+    duration_sec: data.duration_sec,
+    distance_km: data.distance_km,
+    calories: data.calories,
+  }
+}
+
+function handleCardioComplete(exerciseIndex: number) {
+  const exercise = exercises.value[exerciseIndex]
+  if (!exercise || !exercise.cardio) return
+
+  exercise.cardio.completed = true
+}
+
+function handleCardioRemove(exerciseIndex: number) {
+  removeExercise(exerciseIndex)
+}
+
+// Calculate volume (only for strength exercises)
 const totalVolume = computed(() => {
   return exercises.value.reduce((sum, ex) => {
+    if (ex.category === 'cardio') return sum
     return sum + ex.sets.reduce((setSum, set) => {
       return setSum + ((set.weight || 0) * (set.reps || 0))
     }, 0)
@@ -222,7 +285,17 @@ async function saveChanges() {
     name: workoutName.value,
     date: selectedDate,
     duration,
-    exercises: exercises.value,
+    exercises: exercises.value.map(ex => ({
+      name: ex.name,
+      category: ex.category,
+      sets: ex.sets,
+      cardio: ex.cardio ? {
+        duration_sec: ex.cardio.duration_sec || 0,
+        distance_km: ex.cardio.distance_km,
+        calories: ex.cardio.calories,
+        completed: ex.cardio.completed,
+      } : undefined,
+    })),
     volume: totalVolume.value,
     notes: workoutNotes.value,
   })
@@ -395,8 +468,30 @@ function formatMuscleGroups(groups: string[]) {
             </div>
           </template>
 
-          <!-- Sets Table -->
-          <div class="space-y-3">
+          <!-- Cardio Input for cardio exercises -->
+          <div v-if="exercise.category === 'cardio' && exercise.cardio" class="space-y-3">
+            <CardioInput
+              :exercise-index="exIndex"
+              :tracking-type="exercise.trackingType || 'duration'"
+              :cardio-log="{
+                duration_sec: exercise.cardio.duration_sec,
+                distance_km: exercise.cardio.distance_km,
+                calories: exercise.cardio.calories,
+              }"
+              @update="(data) => handleCardioUpdate(exIndex, data)"
+              @complete="handleCardioComplete(exIndex)"
+              @remove="handleCardioRemove(exIndex)"
+            />
+            <div v-if="exercise.cardio.completed" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
+              </svg>
+              <span class="text-sm font-medium text-green-700 dark:text-green-300">Completed</span>
+            </div>
+          </div>
+
+          <!-- Sets Table for strength exercises -->
+          <div v-else class="space-y-3">
             <div class="grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 px-1">
               <div class="col-span-2">Set</div>
               <div class="col-span-4">Weight (kg)</div>
@@ -523,8 +618,16 @@ function formatMuscleGroups(groups: string[]) {
           class="w-full text-left p-3 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:shadow-md transition-all"
           @click="addExercise(exercise)"
         >
-          <div class="font-medium text-gray-900 dark:text-white">
-            {{ exercise.name }}
+          <div class="flex items-center gap-2">
+            <span class="font-medium text-gray-900 dark:text-white">
+              {{ exercise.name }}
+            </span>
+            <span
+              v-if="exercise.category === 'cardio'"
+              class="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+            >
+              Cardio
+            </span>
           </div>
           <div class="text-sm text-gray-500 dark:text-gray-400">
             {{ formatMuscleGroups(exercise.muscleGroups) }}

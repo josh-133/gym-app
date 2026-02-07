@@ -573,7 +573,7 @@ onMounted(() => {
                 :exercise-index="index"
                 :exercise-name="log.exercise.name"
                 :previous-sets="getLastPerformedSets(log.exercise.name)"
-                @add-drop-set="workoutStore.addDropSet(index)"
+                @add-drop-set="(setIdx: number) => workoutStore.addDropSet(index, setIdx)"
               />
 
               <!-- Add Set Button -->

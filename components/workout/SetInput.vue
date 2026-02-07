@@ -27,7 +27,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  addDropSet: []
+  addDropSet: [setIndex: number]
 }>()
 
 const workoutStore = useWorkoutStore()
@@ -84,7 +84,7 @@ function changeSetType(newType: SetType) {
 }
 
 function handleAddDropSet() {
-  emit('addDropSet')
+  emit('addDropSet', props.setIndex)
 }
 
 // RPE descriptions
