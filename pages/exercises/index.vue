@@ -7,6 +7,7 @@ definePageMeta({
 })
 
 const { customExercisesAsDefinitions, fetchCustomExercises, addCustomExercise, deleteCustomExercise, loading: customLoading } = useCustomExercises()
+const { user } = useAuth()
 const notification = useNotification()
 
 // Fetch custom exercises on mount
@@ -46,15 +47,21 @@ function resetForm() {
 async function handleAddExercise() {
   if (!newExercise.value.name.trim() || newExercise.value.muscleGroups.length === 0) return
 
+  if (!user.value) {
+    notification.error('Please log in to create custom exercises.')
+    return
+  }
+
   saving.value = true
   try {
     await addCustomExercise(newExercise.value)
     showAddModal.value = false
     resetForm()
     notification.success('Exercise created!')
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error adding exercise:', err)
-    notification.error('Failed to create exercise. Please try again.')
+    const message = err?.message || 'Failed to create exercise. Please try again.'
+    notification.error(message)
   } finally {
     saving.value = false
   }

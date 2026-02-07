@@ -48,27 +48,31 @@ export function useCustomExercises() {
     difficulty: 'beginner' | 'intermediate' | 'advanced'
     isCompound: boolean
   }) {
-    if (!$supabase || !user.value) throw new Error('Not authenticated')
+    if (!$supabase) throw new Error('Supabase not configured')
+    if (!user.value) throw new Error('Not authenticated')
 
-    const { data, error } = await $supabase
+    const insertData = {
+      user_id: user.value.id,
+      name: exercise.name,
+      category: exercise.category,
+      muscle_groups: exercise.muscleGroups,
+      equipment: exercise.equipment,
+      difficulty: exercise.difficulty,
+      is_compound: exercise.isCompound,
+      is_system: false,
+    }
+
+    const { error: insertError } = await $supabase
       .from('exercises')
-      .insert({
-        user_id: user.value.id,
-        name: exercise.name,
-        category: exercise.category,
-        muscle_groups: exercise.muscleGroups,
-        equipment: exercise.equipment,
-        difficulty: exercise.difficulty,
-        is_compound: exercise.isCompound,
-        is_system: false,
-      })
-      .select()
-      .single()
+      .insert(insertData)
 
-    if (error) throw error
+    if (insertError) {
+      console.error('Insert error:', insertError)
+      throw insertError
+    }
 
-    customExercises.value = [data, ...customExercises.value]
-    return data
+    // Refetch all custom exercises to get the updated list
+    await fetchCustomExercises()
   }
 
   async function deleteCustomExercise(id: string) {
