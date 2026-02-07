@@ -1,3 +1,5 @@
+import { parseServingSize } from '~/server/utils/food'
+
 interface OpenFoodFactsProduct {
   code: string
   product_name: string
@@ -97,20 +99,3 @@ export default defineEventHandler(async (event) => {
     })
   }
 })
-
-// Parse serving size string to grams
-function parseServingSize(servingSize?: string): number | null {
-  if (!servingSize) return null
-
-  const gramsMatch = servingSize.match(/(\d+(?:\.\d+)?)\s*g(?:rams?)?/i)
-  if (gramsMatch) {
-    return parseFloat(gramsMatch[1])
-  }
-
-  const mlMatch = servingSize.match(/(\d+(?:\.\d+)?)\s*ml/i)
-  if (mlMatch) {
-    return parseFloat(mlMatch[1])
-  }
-
-  return null
-}

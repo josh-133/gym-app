@@ -275,7 +275,7 @@ async function saveMeasurements() {
         <NSelect
           v-model:value="timeRange"
           :options="timeRangeOptions"
-          style="width: 140px"
+          class="w-[120px] sm:w-[140px]"
         />
         <NButton type="primary" @click="openWeightModal">
           <template #icon>

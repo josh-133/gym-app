@@ -430,7 +430,7 @@ function formatDate(dateStr: string) {
     <!-- Quick Start -->
     <div class="card p-6">
       <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-4">Quick Start</h2>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4">
         <NuxtLink
           v-for="action in quickActions"
           :key="action.label"

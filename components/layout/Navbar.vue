@@ -52,7 +52,7 @@ async function handleUserMenuSelect(key: string) {
     <div class="flex items-center gap-4">
       <!-- Mobile menu button -->
       <button
-        class="lg:hidden p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+        class="lg:hidden p-2.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[44px] min-h-[44px] flex items-center justify-center"
         @click="uiStore.toggleMobileMenu"
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +62,7 @@ async function handleUserMenuSelect(key: string) {
 
       <!-- Desktop sidebar toggle -->
       <button
-        class="hidden lg:flex p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+        class="hidden lg:flex p-2.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[44px] min-h-[44px] items-center justify-center"
         @click="uiStore.toggleSidebar"
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,7 +92,7 @@ async function handleUserMenuSelect(key: string) {
 
       <!-- Theme toggle -->
       <button
-        class="p-2 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+        class="p-2.5 rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[44px] min-h-[44px] flex items-center justify-center"
         @click="uiStore.toggleTheme"
         :title="`Theme: ${uiStore.theme}`"
       >

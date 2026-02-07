@@ -311,8 +311,7 @@ function getProgressPercentage(value: number, max: number) {
       <NSelect
         v-model:value="timeRange"
         :options="timeRangeOptions"
-        style="width: 160px"
-        class="!rounded-xl"
+        class="w-[140px] sm:w-[160px] !rounded-xl"
       />
     </div>
 
@@ -365,7 +364,7 @@ function getProgressPercentage(value: number, max: number) {
           <NSelect
             v-model:value="selectedExercise"
             :options="exerciseOptions"
-            style="width: 180px"
+            class="w-[140px] sm:w-[180px]"
             size="small"
             :disabled="exerciseOptions.length === 0"
           />

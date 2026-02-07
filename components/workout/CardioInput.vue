@@ -260,6 +260,7 @@ const distanceLabel = computed(() => unitSystem.value === 'imperial' ? 'Distance
 
 .input-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -272,6 +273,7 @@ const distanceLabel = computed(() => unitSystem.value === 'imperial' ? 'Distance
   display: flex;
   align-items: flex-end;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
 .time-separator {
@@ -283,11 +285,13 @@ const distanceLabel = computed(() => unitSystem.value === 'imperial' ? 'Distance
 
 .input-group {
   flex: 1;
+  min-width: 70px;
 }
 
 .input-group.time {
-  flex: 0 0 80px;
-  min-width: 80px;
+  flex: 1 1 60px;
+  min-width: 60px;
+  max-width: 80px;
 }
 
 .input-group.reps-only {
@@ -320,5 +324,18 @@ const distanceLabel = computed(() => unitSystem.value === 'imperial' ? 'Distance
   justify-content: space-between;
   padding-top: 8px;
   border-top: 1px solid var(--n-divider-color);
+}
+
+/* Mobile-friendly stacking */
+@media (max-width: 400px) {
+  .time-inputs {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .input-group.time {
+    flex: 1 1 calc(33% - 16px);
+    max-width: none;
+  }
 }
 </style>

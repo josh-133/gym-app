@@ -6,7 +6,6 @@ export interface SubscriptionInfo {
   status: SubscriptionStatus
   isPremium: boolean
   endsAt: string | null
-  stripeCustomerId: string | null
 }
 
 export async function getSubscriptionStatus(event: H3Event, userId: string): Promise<SubscriptionInfo> {
@@ -28,7 +27,6 @@ export async function getSubscriptionStatus(event: H3Event, userId: string): Pro
       status: 'free',
       isPremium: false,
       endsAt: null,
-      stripeCustomerId: null,
     }
   }
 
@@ -44,16 +42,5 @@ export async function getSubscriptionStatus(event: H3Event, userId: string): Pro
     status: isPremium ? 'premium' : (profile.subscription_status || 'free'),
     isPremium,
     endsAt: profile.subscription_ends_at,
-    stripeCustomerId: profile.stripe_customer_id,
-  }
-}
-
-export function requirePremium(subscription: SubscriptionInfo): void {
-  if (!subscription.isPremium) {
-    throw createError({
-      statusCode: 403,
-      message: 'Premium subscription required',
-      data: { requiresUpgrade: true },
-    })
   }
 }

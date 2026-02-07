@@ -119,7 +119,7 @@ function removeSet() {
 
 <template>
   <div
-    class="grid grid-cols-12 gap-2 items-center p-2 rounded-lg transition-colors"
+    class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-2 items-center p-2 rounded-lg transition-colors"
     :class="isCompleted ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-50 dark:bg-gray-800/50'"
   >
     <!-- Set Number -->
@@ -127,13 +127,13 @@ function removeSet() {
       {{ set.set_number }}
     </div>
 
-    <!-- Previous -->
-    <div class="col-span-3 text-sm text-gray-400 dark:text-gray-500">
+    <!-- Previous (hidden on smallest screens) -->
+    <div class="hidden sm:block sm:col-span-2 lg:col-span-3 text-sm text-gray-400 dark:text-gray-500">
       {{ previousDisplay || '-' }}
     </div>
 
     <!-- Weight -->
-    <div class="col-span-3">
+    <div class="col-span-1 sm:col-span-1 lg:col-span-3">
       <div v-if="isBodyweight" class="flex items-center gap-1">
         <span class="text-sm text-gray-500 dark:text-gray-400 flex-1">BW</span>
         <button
@@ -170,7 +170,7 @@ function removeSet() {
     </div>
 
     <!-- Reps -->
-    <div class="col-span-3">
+    <div class="col-span-1 sm:col-span-1 lg:col-span-3">
       <NInputNumber
         v-model:value="reps"
         placeholder="reps"
@@ -182,7 +182,7 @@ function removeSet() {
     </div>
 
     <!-- Actions -->
-    <div class="col-span-2 flex justify-center gap-1">
+    <div class="col-span-1 sm:col-span-1 lg:col-span-2 flex justify-center gap-1">
       <!-- RPE Button (shows after set is completed) -->
       <div v-if="isCompleted" class="relative">
         <button
@@ -221,7 +221,7 @@ function removeSet() {
       </span>
 
       <button
-        class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"
+        class="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30"
         @click="removeSet"
         title="Remove set"
       >
@@ -232,7 +232,7 @@ function removeSet() {
     </div>
 
     <!-- PR Badge -->
-    <div v-if="set.is_pr" class="col-span-12 mt-1">
+    <div v-if="set.is_pr" class="col-span-4 sm:col-span-6 lg:col-span-12 mt-1">
       <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-medium">
         <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />

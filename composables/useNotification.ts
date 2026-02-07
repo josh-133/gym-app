@@ -1,11 +1,5 @@
 import { useMessage, type MessageApi } from 'naive-ui'
 
-let messageApi: MessageApi | null = null
-
-export function setupMessageApi(api: MessageApi) {
-  messageApi = api
-}
-
 export function useNotification() {
   // Try to get the message API from Naive UI's injection
   // This works when called within a component that's inside NMessageProvider
@@ -15,8 +9,7 @@ export function useNotification() {
     message = useMessage()
   } catch {
     // useMessage can throw if not inside NMessageProvider
-    // Fall back to the global messageApi if available
-    message = messageApi
+    message = null
   }
 
   function success(content: string, duration = 3000) {

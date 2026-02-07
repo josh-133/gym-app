@@ -26,7 +26,7 @@ function isActive(path: string) {
       <li v-for="item in navItems" :key="item.to">
         <NuxtLink
           :to="item.to"
-          class="flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[60px]"
+          class="flex flex-col items-center gap-1 px-3 py-3 rounded-xl min-w-[70px] min-h-[44px]"
           :class="[
             isActive(item.to)
               ? 'text-primary-900 dark:text-white'

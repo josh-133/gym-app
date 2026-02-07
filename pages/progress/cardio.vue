@@ -342,8 +342,7 @@ const distanceUnit = computed(() => unitSystem.value === 'imperial' ? 'mi' : 'km
       <NSelect
         v-model:value="timeRange"
         :options="timeRangeOptions"
-        style="width: 160px"
-        class="!rounded-xl"
+        class="w-[140px] sm:w-[160px] !rounded-xl"
       />
     </div>
 
@@ -398,7 +397,7 @@ const distanceUnit = computed(() => unitSystem.value === 'imperial' ? 'mi' : 'km
           <NSelect
             v-model:value="selectedExercise"
             :options="cardioExerciseOptions"
-            style="width: 180px"
+            class="w-[140px] sm:w-[180px]"
             size="small"
             :disabled="cardioExerciseOptions.length === 0"
           />
@@ -481,7 +480,7 @@ const distanceUnit = computed(() => unitSystem.value === 'imperial' ? 'mi' : 'km
             v-if="!exerciseProgress.some(p => p.pace_sec_per_km)"
             v-model:value="selectedExercise"
             :options="cardioExerciseOptions"
-            style="width: 180px"
+            class="w-[140px] sm:w-[180px]"
             size="small"
           />
         </div>
