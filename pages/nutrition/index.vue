@@ -57,6 +57,11 @@ async function handleDelete(id: string) {
   }
 }
 
+// Handle edit food entry
+function handleEdit(id: string) {
+  navigateTo(`/nutrition/edit/${id}`)
+}
+
 // Navigate to add food page with meal type
 function addFood(mealType: string) {
   navigateTo(`/nutrition/add?meal=${mealType}&date=${selectedDate.value}`)
@@ -285,13 +290,23 @@ function addFood(mealType: string) {
                   {{ entry.brand ? `${entry.brand} • ` : '' }}{{ entry.serving_size_g }}g × {{ entry.servings }}
                 </p>
               </div>
-              <div class="flex items-center gap-4">
-                <div class="text-right">
+              <div class="flex items-center gap-2">
+                <div class="text-right mr-2">
                   <p class="font-semibold text-gray-900 dark:text-white">{{ Math.round(entry.calories) }}</p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">cal</p>
                 </div>
                 <button
+                  class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-primary-500 transition-all"
+                  title="Edit"
+                  @click.stop="handleEdit(entry.id)"
+                >
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
                   class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all"
+                  title="Delete"
                   @click.stop="handleDelete(entry.id)"
                 >
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -87,7 +87,10 @@ export function useNutrition() {
 
   // Fetch nutrition goals
   async function fetchNutritionGoals() {
-    if (!$supabase || !user.value) return
+    if (!$supabase || !user.value) {
+      goalsLoading.value = false
+      return
+    }
 
     goalsLoading.value = true
     try {
@@ -176,7 +179,10 @@ export function useNutrition() {
 
   // Fetch food entries for a specific date
   async function fetchFoodEntries(date?: string) {
-    if (!$supabase || !user.value) return
+    if (!$supabase || !user.value) {
+      loading.value = false
+      return
+    }
 
     const targetDate = date || selectedDate.value
     loading.value = true
@@ -254,6 +260,28 @@ export function useNutrition() {
       foodEntries.value = [...foodEntries.value, data].sort(
         (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
       )
+    }
+
+    return data
+  }
+
+  // Get a single food entry by ID
+  async function getFoodEntryById(id: string): Promise<FoodEntry | null> {
+    if (!$supabase || !user.value) return null
+
+    const { data, error } = await $supabase
+      .from('food_entries')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.value.id)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Not found
+        return null
+      }
+      throw error
     }
 
     return data
@@ -440,6 +468,7 @@ export function useNutrition() {
     fetchNutritionGoals,
     saveNutritionGoals,
     fetchFoodEntries,
+    getFoodEntryById,
     addFoodEntry,
     updateFoodEntry,
     deleteFoodEntry,
