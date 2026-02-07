@@ -36,6 +36,7 @@ const onSubmit = handleSubmit(async (values) => {
     await navigateTo('/dashboard')
   } catch (e: any) {
     error.value = e.message || 'Failed to sign in'
+    password.value = '' // Clear password on failed login for security
   } finally {
     loading.value = false
   }

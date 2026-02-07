@@ -92,7 +92,7 @@ export function useWorkoutHistory() {
   function updateWorkout(id: string, updates: Partial<Omit<SavedWorkout, 'id'>>) {
     const index = workouts.value.findIndex(w => w.id === id)
     if (index !== -1) {
-      workouts.value[index] = { ...workouts.value[index], ...updates }
+      workouts.value.splice(index, 1, { ...workouts.value[index], ...updates })
       saveWorkouts()
       return true
     }

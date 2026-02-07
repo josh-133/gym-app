@@ -103,7 +103,7 @@ export function useGoals() {
 
     const index = goals.value.findIndex((g) => g.id === id)
     if (index !== -1) {
-      goals.value[index] = data
+      goals.value.splice(index, 1, data)
     }
     return data
   }
@@ -132,7 +132,7 @@ export function useGoals() {
 
     const index = goals.value.findIndex((g) => g.id === id)
     if (index !== -1) {
-      goals.value[index] = data
+      goals.value.splice(index, 1, data)
     }
     return data
   }

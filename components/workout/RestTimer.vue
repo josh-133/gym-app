@@ -72,14 +72,6 @@ function addTime(seconds: number) {
     remainingSeconds.value = workoutStore.restTimerRemaining
   }
 }
-
-// Calculate progress percentage
-const progressPercent = computed(() => {
-  if (!workoutStore.restTimerEndAt || remainingSeconds.value <= 0) return 0
-  // We don't know the original duration, so just show remaining time visually
-  return 100
-})
-
 onUnmounted(() => {
   clearIntervalSafe()
 })

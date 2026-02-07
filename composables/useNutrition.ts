@@ -303,7 +303,7 @@ export function useNutrition() {
 
     const index = foodEntries.value.findIndex((e) => e.id === id)
     if (index !== -1) {
-      foodEntries.value[index] = data
+      foodEntries.value.splice(index, 1, data)
     }
     return data
   }

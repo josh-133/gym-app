@@ -214,7 +214,7 @@ export function useFoodSearch() {
 
     const index = customFoods.value.findIndex((f) => f.id === id)
     if (index !== -1) {
-      customFoods.value[index] = data
+      customFoods.value.splice(index, 1, data)
     }
     return data
   }
@@ -270,19 +270,20 @@ export function useFoodSearch() {
         const key = `${entry.food_name}|${entry.brand || ''}`
         if (!seen.has(key)) {
           seen.add(key)
+          const servingSize = Number(entry.serving_size_g) || 100 // Prevent division by zero
           unique.push({
             id: key,
             name: entry.food_name,
             brand: entry.brand,
             barcode: entry.barcode,
             // Calculate per 100g from entry values
-            calories_per_100g: (Number(entry.calories) / Number(entry.serving_size_g)) * 100,
-            protein_per_100g: (Number(entry.protein_g) / Number(entry.serving_size_g)) * 100,
-            carbs_per_100g: (Number(entry.carbs_g) / Number(entry.serving_size_g)) * 100,
-            fat_per_100g: (Number(entry.fat_g) / Number(entry.serving_size_g)) * 100,
-            fiber_per_100g: entry.fiber_g ? (Number(entry.fiber_g) / Number(entry.serving_size_g)) * 100 : null,
-            sugar_per_100g: entry.sugar_g ? (Number(entry.sugar_g) / Number(entry.serving_size_g)) * 100 : null,
-            serving_size_g: Number(entry.serving_size_g),
+            calories_per_100g: (Number(entry.calories) / servingSize) * 100,
+            protein_per_100g: (Number(entry.protein_g) / servingSize) * 100,
+            carbs_per_100g: (Number(entry.carbs_g) / servingSize) * 100,
+            fat_per_100g: (Number(entry.fat_g) / servingSize) * 100,
+            fiber_per_100g: entry.fiber_g ? (Number(entry.fiber_g) / servingSize) * 100 : null,
+            sugar_per_100g: entry.sugar_g ? (Number(entry.sugar_g) / servingSize) * 100 : null,
+            serving_size_g: servingSize,
             image_url: null,
           })
         }

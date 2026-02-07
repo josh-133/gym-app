@@ -131,7 +131,7 @@ export function useTemplates() {
   function updateTemplate(id: string, updates: Partial<Omit<WorkoutTemplate, 'id' | 'createdAt'>>) {
     const index = templates.value.findIndex(t => t.id === id)
     if (index !== -1) {
-      templates.value[index] = { ...templates.value[index], ...updates }
+      templates.value.splice(index, 1, { ...templates.value[index], ...updates })
       saveTemplates()
       return true
     }
