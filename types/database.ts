@@ -9,6 +9,7 @@ export type WorkoutStatus = 'in_progress' | 'completed' | 'cancelled'
 export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say'
 export type RecordType = 'max_weight' | 'max_reps' | 'max_volume' | 'max_duration' | 'max_distance' | 'fastest_pace'
 export type InsightType = 'recommendation' | 'analysis' | 'warning' | 'celebration'
+export type ExerciseGroupType = 'superset' | 'circuit'
 export type AchievementCategory = 'consistency' | 'strength' | 'endurance' | 'milestone' | 'social'
 export type SubscriptionStatus = 'free' | 'premium' | 'cancelled' | 'past_due'
 

@@ -21,6 +21,8 @@ interface SavedWorkout {
       rpe?: number | null
     }[]
     cardio?: CardioData
+    group_id?: string | null
+    group_type?: 'superset' | 'circuit' | null
   }[]
   volume: number
   rating: number | null

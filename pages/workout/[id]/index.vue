@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { NCard, NButton, NTag, NEmpty, NModal } from 'naive-ui'
 import { EXERCISE_LIBRARY, type CardioTrackingType } from '~/utils/exercises'
-import type { Exercise } from '~/types/database'
+import type { Exercise, ExerciseGroupType } from '~/types/database'
+import ExerciseGroup from '~/components/workout/ExerciseGroup.vue'
 
 definePageMeta({
   middleware: ['auth'],
@@ -48,6 +49,8 @@ interface WorkoutData {
       is_pr?: boolean
     }[]
     cardio?: CardioData
+    group_id?: string | null
+    group_type?: ExerciseGroupType | null
   }[]
 }
 
@@ -80,6 +83,37 @@ const prsHit = computed(() => {
   return workout.value.exercises.reduce((sum, ex) => {
     return sum + ex.sets.filter(s => s.is_pr).length
   }, 0)
+})
+
+type WorkoutExercise = NonNullable<typeof workout.value>['exercises'][number]
+type GroupedEntry = { type: 'standalone'; exercise: WorkoutExercise; index: number }
+  | { type: 'group'; groupId: string; groupType: ExerciseGroupType; exercises: { exercise: WorkoutExercise; index: number }[] }
+
+const groupedExercises = computed<GroupedEntry[]>(() => {
+  if (!workout.value) return []
+  const entries: GroupedEntry[] = []
+  const seenGroupIds = new Set<string>()
+  const exs = workout.value.exercises
+
+  for (let i = 0; i < exs.length; i++) {
+    const ex = exs[i]
+    if (ex.group_id) {
+      if (seenGroupIds.has(ex.group_id)) continue
+      seenGroupIds.add(ex.group_id)
+      const members = exs
+        .map((e, idx) => ({ exercise: e, index: idx }))
+        .filter(item => item.exercise.group_id === ex.group_id)
+      entries.push({
+        type: 'group',
+        groupId: ex.group_id,
+        groupType: (ex.group_type || 'superset') as ExerciseGroupType,
+        exercises: members,
+      })
+    } else {
+      entries.push({ type: 'standalone', exercise: ex, index: i })
+    }
+  }
+  return entries
 })
 
 onMounted(async () => {
@@ -124,6 +158,8 @@ onMounted(async () => {
           is_pr: false,
         })),
         cardio: ex.cardio,
+        group_id: ex.group_id,
+        group_type: ex.group_type,
       })),
     }
   } else {
@@ -396,107 +432,210 @@ function repeatWorkout() {
       <div class="space-y-4">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Exercises</h2>
 
-        <NCard v-for="(exercise, index) in workout.exercises" :key="index">
-          <template #header>
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ index + 1 }}</span>
+        <template v-for="entry in groupedExercises" :key="entry.type === 'group' ? entry.groupId : entry.index">
+          <!-- Grouped Exercises -->
+          <ExerciseGroup
+            v-if="entry.type === 'group'"
+            :group-type="entry.groupType"
+            :exercise-count="entry.exercises.length"
+            :readonly="true"
+          >
+            <NCard v-for="(member, memberIdx) in entry.exercises" :key="member.index">
+              <template #header>
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                    <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ String.fromCharCode(65 + memberIdx) }}</span>
+                  </div>
+                  <div>
+                    <h3 class="font-semibold text-gray-900 dark:text-white">{{ member.exercise.name }}</h3>
+                    <NTag v-if="isCardioExercise(member.exercise.name)" size="tiny" type="success">Cardio</NTag>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Cardio Display -->
+              <div v-if="member.exercise.cardio && member.exercise.cardio.completed" class="space-y-4">
+                <div v-if="getCardioTrackingType(member.exercise.name) === 'reps'" class="grid grid-cols-1 gap-4">
+                  <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ member.exercise.cardio.duration_sec }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Reps</p>
+                  </div>
+                </div>
+                <div v-else-if="getCardioTrackingType(member.exercise.name) === 'duration_distance'" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(member.exercise.cardio.duration_sec) }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
+                  </div>
+                  <div v-if="member.exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatDistance(member.exercise.cardio.distance_km) }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Distance</p>
+                  </div>
+                  <div v-if="member.exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatPace(member.exercise.cardio.duration_sec, member.exercise.cardio.distance_km) }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Pace</p>
+                  </div>
+                  <div v-if="member.exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ member.exercise.cardio.calories }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
+                  </div>
+                </div>
+                <div v-else class="grid grid-cols-2 gap-4">
+                  <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(member.exercise.cardio.duration_sec) }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
+                  </div>
+                  <div v-if="member.exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ member.exercise.cardio.calories }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 class="font-semibold text-gray-900 dark:text-white">{{ exercise.name }}</h3>
-                <NTag v-if="isCardioExercise(exercise.name)" size="tiny" type="success">Cardio</NTag>
+
+              <!-- Strength Sets Table -->
+              <div v-else class="overflow-x-auto">
+                <table class="w-full">
+                  <thead>
+                    <tr class="text-left text-sm text-gray-500 dark:text-gray-400">
+                      <th class="pb-2 font-medium">Set</th>
+                      <th class="pb-2 font-medium">Type</th>
+                      <th class="pb-2 font-medium">Weight</th>
+                      <th class="pb-2 font-medium">Reps</th>
+                      <th class="pb-2 font-medium"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="set in member.exercise.sets"
+                      :key="set.set_number"
+                      class="border-t border-gray-100 dark:border-gray-700"
+                      :class="isDropSet(set.type) ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''"
+                    >
+                      <td class="py-2 font-medium text-gray-900 dark:text-white" :class="isDropSet(set.type) ? 'pl-4' : ''">
+                        {{ set.set_number }}
+                      </td>
+                      <td class="py-2">
+                        <NTag :type="getSetTypeColor(set.type)" size="small">{{ getSetTypeLabel(set.type) }}</NTag>
+                      </td>
+                      <td class="py-2 text-gray-900 dark:text-white">{{ convertWeight(set.weight) }} {{ weightUnit }}</td>
+                      <td class="py-2 text-gray-900 dark:text-white">{{ set.reps }}</td>
+                      <td class="py-2">
+                        <div class="flex items-center gap-2">
+                          <span v-if="set.rpe" class="text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                            @{{ set.rpe }}
+                          </span>
+                          <span v-if="set.is_pr" class="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            PR
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </NCard>
+          </ExerciseGroup>
+
+          <!-- Standalone Exercise -->
+          <NCard v-else>
+            <template #header>
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                  <span class="font-bold text-indigo-600 dark:text-indigo-400">{{ entry.index + 1 }}</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-gray-900 dark:text-white">{{ entry.exercise.name }}</h3>
+                  <NTag v-if="isCardioExercise(entry.exercise.name)" size="tiny" type="success">Cardio</NTag>
+                </div>
+              </div>
+            </template>
+
+            <!-- Cardio Display -->
+            <div v-if="entry.exercise.cardio && entry.exercise.cardio.completed" class="space-y-4">
+              <div v-if="getCardioTrackingType(entry.exercise.name) === 'reps'" class="grid grid-cols-1 gap-4">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ entry.exercise.cardio.duration_sec }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Reps</p>
+                </div>
+              </div>
+              <div v-else-if="getCardioTrackingType(entry.exercise.name) === 'duration_distance'" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(entry.exercise.cardio.duration_sec) }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
+                </div>
+                <div v-if="entry.exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatDistance(entry.exercise.cardio.distance_km) }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Distance</p>
+                </div>
+                <div v-if="entry.exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatPace(entry.exercise.cardio.duration_sec, entry.exercise.cardio.distance_km) }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Pace</p>
+                </div>
+                <div v-if="entry.exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ entry.exercise.cardio.calories }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
+                </div>
+              </div>
+              <div v-else class="grid grid-cols-2 gap-4">
+                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(entry.exercise.cardio.duration_sec) }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
+                </div>
+                <div v-if="entry.exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
+                  <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ entry.exercise.cardio.calories }}</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
+                </div>
               </div>
             </div>
-          </template>
 
-          <!-- Cardio Display -->
-          <div v-if="exercise.cardio && exercise.cardio.completed" class="space-y-4">
-            <!-- Reps-based cardio (box jumps, burpees, etc.) -->
-            <div v-if="getCardioTrackingType(exercise.name) === 'reps'" class="grid grid-cols-1 gap-4">
-              <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ exercise.cardio.duration_sec }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Reps</p>
-              </div>
+            <!-- Strength Sets Table -->
+            <div v-else class="overflow-x-auto">
+              <table class="w-full">
+                <thead>
+                  <tr class="text-left text-sm text-gray-500 dark:text-gray-400">
+                    <th class="pb-2 font-medium">Set</th>
+                    <th class="pb-2 font-medium">Type</th>
+                    <th class="pb-2 font-medium">Weight</th>
+                    <th class="pb-2 font-medium">Reps</th>
+                    <th class="pb-2 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="set in entry.exercise.sets"
+                    :key="set.set_number"
+                    class="border-t border-gray-100 dark:border-gray-700"
+                    :class="isDropSet(set.type) ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''"
+                  >
+                    <td class="py-2 font-medium text-gray-900 dark:text-white" :class="isDropSet(set.type) ? 'pl-4' : ''">
+                      {{ set.set_number }}
+                    </td>
+                    <td class="py-2">
+                      <NTag :type="getSetTypeColor(set.type)" size="small">{{ getSetTypeLabel(set.type) }}</NTag>
+                    </td>
+                    <td class="py-2 text-gray-900 dark:text-white">{{ convertWeight(set.weight) }} {{ weightUnit }}</td>
+                    <td class="py-2 text-gray-900 dark:text-white">{{ set.reps }}</td>
+                    <td class="py-2">
+                      <div class="flex items-center gap-2">
+                        <span v-if="set.rpe" class="text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                          @{{ set.rpe }}
+                        </span>
+                        <span v-if="set.is_pr" class="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400 text-sm font-medium">
+                          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                          PR
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-
-            <!-- Duration + Distance cardio (running, cycling, etc.) -->
-            <div v-else-if="getCardioTrackingType(exercise.name) === 'duration_distance'" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(exercise.cardio.duration_sec) }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
-              </div>
-              <div v-if="exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatDistance(exercise.cardio.distance_km) }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Distance</p>
-              </div>
-              <div v-if="exercise.cardio.distance_km" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatPace(exercise.cardio.duration_sec, exercise.cardio.distance_km) }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Pace</p>
-              </div>
-              <div v-if="exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ exercise.cardio.calories }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
-              </div>
-            </div>
-
-            <!-- Duration-only cardio (stair climber, jump rope, etc.) -->
-            <div v-else class="grid grid-cols-2 gap-4">
-              <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCardioDuration(exercise.cardio.duration_sec) }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Duration</p>
-              </div>
-              <div v-if="exercise.cardio.calories" class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-center">
-                <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ exercise.cardio.calories }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Calories</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Strength Sets Table -->
-          <div v-else class="overflow-x-auto">
-            <table class="w-full">
-              <thead>
-                <tr class="text-left text-sm text-gray-500 dark:text-gray-400">
-                  <th class="pb-2 font-medium">Set</th>
-                  <th class="pb-2 font-medium">Type</th>
-                  <th class="pb-2 font-medium">Weight</th>
-                  <th class="pb-2 font-medium">Reps</th>
-                  <th class="pb-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="set in exercise.sets"
-                  :key="set.set_number"
-                  class="border-t border-gray-100 dark:border-gray-700"
-                  :class="isDropSet(set.type) ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''"
-                >
-                  <td class="py-2 font-medium text-gray-900 dark:text-white" :class="isDropSet(set.type) ? 'pl-4' : ''">
-                    {{ set.set_number }}
-                  </td>
-                  <td class="py-2">
-                    <NTag :type="getSetTypeColor(set.type)" size="small">{{ getSetTypeLabel(set.type) }}</NTag>
-                  </td>
-                  <td class="py-2 text-gray-900 dark:text-white">{{ convertWeight(set.weight) }} {{ weightUnit }}</td>
-                  <td class="py-2 text-gray-900 dark:text-white">{{ set.reps }}</td>
-                  <td class="py-2">
-                    <div class="flex items-center gap-2">
-                      <span v-if="set.rpe" class="text-xs px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
-                        @{{ set.rpe }}
-                      </span>
-                      <span v-if="set.is_pr" class="inline-flex items-center gap-1 text-yellow-600 dark:text-yellow-400 text-sm font-medium">
-                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        PR
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </NCard>
+          </NCard>
+        </template>
       </div>
     </template>
 

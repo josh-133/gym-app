@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { NCard, NButton, NInput, NInputNumber, NDatePicker, NModal, NEmpty } from 'naive-ui'
 import { EXERCISE_LIBRARY, type CardioTrackingType, type ExerciseCategory } from '~/utils/exercises'
+import type { ExerciseGroupType } from '~/types/database'
 import CardioInput from '~/components/workout/CardioInput.vue'
+import ExerciseGroup from '~/components/workout/ExerciseGroup.vue'
 
 definePageMeta({
   middleware: ['auth'],
@@ -33,6 +35,8 @@ interface ExerciseData {
     calories: number | null
     completed: boolean
   }
+  group_id?: string | null
+  group_type?: ExerciseGroupType | null
 }
 
 // Form state
@@ -89,6 +93,8 @@ function loadWorkoutData() {
           calories: ex.cardio.calories || null,
           completed: ex.cardio.completed || false,
         } : undefined,
+        group_id: ex.group_id,
+        group_type: ex.group_type,
       }
     })
     dataLoaded.value = true
@@ -165,7 +171,15 @@ function addExercise(exercise: { name: string; category: ExerciseCategory; track
 }
 
 function removeExercise(index: number) {
+  const removed = exercises.value[index]
+  const groupId = removed?.group_id
   exercises.value.splice(index, 1)
+  if (groupId) {
+    const remaining = exercises.value.filter(e => e.group_id === groupId)
+    if (remaining.length < 2) {
+      remaining.forEach(e => { e.group_id = null; e.group_type = null })
+    }
+  }
 }
 
 function addSet(exerciseIndex: number, setType: SetType = 'working') {
@@ -264,6 +278,95 @@ function handleCardioRemove(exerciseIndex: number) {
   removeExercise(exerciseIndex)
 }
 
+// --- Superset / Circuit grouping ---
+type EditGroupedEntry = { type: 'standalone'; exercise: ExerciseData; index: number }
+  | { type: 'group'; groupId: string; groupType: ExerciseGroupType; exercises: { exercise: ExerciseData; index: number }[] }
+
+const groupedExercises = computed<EditGroupedEntry[]>(() => {
+  const entries: EditGroupedEntry[] = []
+  const seenGroupIds = new Set<string>()
+
+  for (let i = 0; i < exercises.value.length; i++) {
+    const ex = exercises.value[i]
+    if (ex.group_id) {
+      if (seenGroupIds.has(ex.group_id)) continue
+      seenGroupIds.add(ex.group_id)
+      const members = exercises.value
+        .map((e, idx) => ({ exercise: e, index: idx }))
+        .filter(item => item.exercise.group_id === ex.group_id)
+      entries.push({
+        type: 'group',
+        groupId: ex.group_id,
+        groupType: (ex.group_type || 'superset') as ExerciseGroupType,
+        exercises: members,
+      })
+    } else {
+      entries.push({ type: 'standalone', exercise: ex, index: i })
+    }
+  }
+  return entries
+})
+
+function linkWithNext(exerciseIndex: number) {
+  const current = exercises.value[exerciseIndex]
+  const next = exercises.value[exerciseIndex + 1]
+  if (!current || !next) return
+
+  const groupId = current.group_id || next.group_id || crypto.randomUUID()
+
+  if (current.group_id && !next.group_id) {
+    next.group_id = current.group_id
+    next.group_type = current.group_type
+  } else if (!current.group_id && next.group_id) {
+    current.group_id = next.group_id
+    current.group_type = next.group_type
+  } else if (!current.group_id && !next.group_id) {
+    current.group_id = groupId
+    current.group_type = 'superset'
+    next.group_id = groupId
+    next.group_type = 'superset'
+  } else if (current.group_id === next.group_id) {
+    return
+  } else {
+    const targetId = current.group_id!
+    const sourceId = next.group_id!
+    exercises.value.forEach(e => {
+      if (e.group_id === sourceId) e.group_id = targetId
+    })
+  }
+
+  const finalGroupId = current.group_id!
+  const members = exercises.value.filter(e => e.group_id === finalGroupId)
+  const groupType: ExerciseGroupType = members.length >= 3 ? 'circuit' : 'superset'
+  members.forEach(e => { e.group_type = groupType })
+}
+
+function editRemoveFromGroup(exerciseIndex: number) {
+  const ex = exercises.value[exerciseIndex]
+  if (!ex || !ex.group_id) return
+
+  const groupId = ex.group_id
+  ex.group_id = null
+  ex.group_type = null
+
+  const remaining = exercises.value.filter(e => e.group_id === groupId)
+  if (remaining.length < 2) {
+    remaining.forEach(e => { e.group_id = null; e.group_type = null })
+  } else {
+    const groupType: ExerciseGroupType = remaining.length >= 3 ? 'circuit' : 'superset'
+    remaining.forEach(e => { e.group_type = groupType })
+  }
+}
+
+function dissolveGroup(groupId: string) {
+  exercises.value.forEach(e => {
+    if (e.group_id === groupId) {
+      e.group_id = null
+      e.group_type = null
+    }
+  })
+}
+
 // Calculate volume (only for strength exercises)
 const totalVolume = computed(() => {
   return exercises.value.reduce((sum, ex) => {
@@ -295,6 +398,8 @@ async function saveChanges() {
         calories: ex.cardio.calories,
         completed: ex.cardio.completed,
       } : undefined,
+      group_id: ex.group_id,
+      group_type: ex.group_type,
     })),
     volume: totalVolume.value,
     notes: workoutNotes.value,
@@ -439,139 +544,301 @@ function formatMuscleGroups(groups: string[]) {
 
         <NEmpty v-if="exercises.length === 0" description="No exercises added yet" />
 
-        <NCard v-for="(exercise, exIndex) in exercises" :key="exIndex">
-          <template #header>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                  <span class="font-bold text-sm text-indigo-600 dark:text-indigo-400">{{ exIndex + 1 }}</span>
+        <template v-for="entry in groupedExercises" :key="entry.type === 'group' ? entry.groupId : entry.index">
+          <!-- Grouped Exercises -->
+          <ExerciseGroup
+            v-if="entry.type === 'group'"
+            :group-type="entry.groupType"
+            :exercise-count="entry.exercises.length"
+            @dissolve="dissolveGroup(entry.groupId)"
+          >
+            <NCard v-for="(member, memberIdx) in entry.exercises" :key="member.index">
+              <template #header>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                      <span class="font-bold text-sm text-indigo-600 dark:text-indigo-400">{{ String.fromCharCode(65 + memberIdx) }}</span>
+                    </div>
+                    <h3 class="font-semibold text-gray-900 dark:text-white">{{ member.exercise.name }}</h3>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <NButton
+                      v-if="member.index < exercises.length - 1"
+                      size="tiny"
+                      quaternary
+                      title="Link with next exercise"
+                      @click="linkWithNext(member.index)"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                    </NButton>
+                    <NButton size="tiny" quaternary title="Remove from group" @click="editRemoveFromGroup(member.index)">
+                      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </NButton>
+                    <NButton size="tiny" quaternary type="error" @click="removeExercise(member.index)">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </NButton>
+                  </div>
                 </div>
-                <h3 class="font-semibold text-gray-900 dark:text-white">{{ exercise.name }}</h3>
-              </div>
-              <div class="flex items-center gap-1">
-                <NButton size="tiny" quaternary :disabled="exIndex === 0" @click="moveExerciseUp(exIndex)">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-                  </svg>
-                </NButton>
-                <NButton size="tiny" quaternary :disabled="exIndex === exercises.length - 1" @click="moveExerciseDown(exIndex)">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </NButton>
-                <NButton size="tiny" quaternary type="error" @click="removeExercise(exIndex)">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </NButton>
-              </div>
-            </div>
-          </template>
+              </template>
 
-          <!-- Cardio Input for cardio exercises -->
-          <div v-if="exercise.category === 'cardio' && exercise.cardio" class="space-y-3">
-            <CardioInput
-              :exercise-index="exIndex"
-              :tracking-type="exercise.trackingType || 'duration'"
-              :cardio-log="{
-                duration_sec: exercise.cardio.duration_sec,
-                distance_km: exercise.cardio.distance_km,
-                calories: exercise.cardio.calories,
-              }"
-              @update="(data) => handleCardioUpdate(exIndex, data)"
-              @complete="handleCardioComplete(exIndex)"
-              @remove="handleCardioRemove(exIndex)"
-            />
-            <div v-if="exercise.cardio.completed" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 24 24">
-                <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
-              </svg>
-              <span class="text-sm font-medium text-green-700 dark:text-green-300">Completed</span>
-            </div>
-          </div>
-
-          <!-- Sets Table for strength exercises -->
-          <div v-else class="space-y-3">
-            <div class="grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 px-1">
-              <div class="col-span-2">Set</div>
-              <div class="col-span-4">Weight (kg)</div>
-              <div class="col-span-4">Reps</div>
-              <div class="col-span-2"></div>
-            </div>
-
-            <div
-              v-for="(set, setIndex) in exercise.sets"
-              :key="setIndex"
-              class="grid grid-cols-12 gap-2 items-center rounded-lg p-1 transition-colors"
-              :class="isDropSet(set.set_type) ? 'bg-amber-50/50 dark:bg-amber-900/10 ml-3 border-l-2 border-amber-400' : ''"
-            >
-              <div class="col-span-2 text-center font-medium text-gray-700 dark:text-gray-300 flex items-center justify-center gap-1">
-                <span>{{ setIndex + 1 }}</span>
-                <span
-                  v-if="getSetTypeLabel(set.set_type)"
-                  class="w-4 h-4 text-xs font-bold rounded flex items-center justify-center"
-                  :class="getSetTypeBadgeClass(set.set_type)"
-                  :title="set.set_type"
-                >
-                  {{ getSetTypeLabel(set.set_type) }}
-                </span>
-              </div>
-              <div class="col-span-4">
-                <NInputNumber
-                  v-model:value="set.weight"
-                  :min="0"
-                  :max="500"
-                  :precision="1"
-                  placeholder="0"
-                  size="small"
+              <!-- Cardio Input for cardio exercises -->
+              <div v-if="member.exercise.category === 'cardio' && member.exercise.cardio" class="space-y-3">
+                <CardioInput
+                  :exercise-index="member.index"
+                  :tracking-type="member.exercise.trackingType || 'duration'"
+                  :cardio-log="{
+                    duration_sec: member.exercise.cardio.duration_sec,
+                    distance_km: member.exercise.cardio.distance_km,
+                    calories: member.exercise.cardio.calories,
+                  }"
+                  @update="(data) => handleCardioUpdate(member.index, data)"
+                  @complete="handleCardioComplete(member.index)"
+                  @remove="handleCardioRemove(member.index)"
                 />
-              </div>
-              <div class="col-span-4">
-                <NInputNumber
-                  v-model:value="set.reps"
-                  :min="0"
-                  :max="100"
-                  placeholder="0"
-                  size="small"
-                />
-              </div>
-              <div class="col-span-2 flex justify-center">
-                <NButton
-                  size="tiny"
-                  quaternary
-                  :disabled="exercise.sets.length <= 1"
-                  @click="removeSet(exIndex, setIndex)"
-                >
-                  <svg class="w-4 h-4 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <div v-if="member.exercise.cardio.completed" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
                   </svg>
-                </NButton>
+                  <span class="text-sm font-medium text-green-700 dark:text-green-300">Completed</span>
+                </div>
+              </div>
+
+              <!-- Sets Table for strength exercises -->
+              <div v-else class="space-y-3">
+                <div class="grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 px-1">
+                  <div class="col-span-2">Set</div>
+                  <div class="col-span-4">Weight (kg)</div>
+                  <div class="col-span-4">Reps</div>
+                  <div class="col-span-2"></div>
+                </div>
+
+                <div
+                  v-for="(set, setIndex) in member.exercise.sets"
+                  :key="setIndex"
+                  class="grid grid-cols-12 gap-2 items-center rounded-lg p-1 transition-colors"
+                  :class="isDropSet(set.set_type) ? 'bg-amber-50/50 dark:bg-amber-900/10 ml-3 border-l-2 border-amber-400' : ''"
+                >
+                  <div class="col-span-2 text-center font-medium text-gray-700 dark:text-gray-300 flex items-center justify-center gap-1">
+                    <span>{{ setIndex + 1 }}</span>
+                    <span
+                      v-if="getSetTypeLabel(set.set_type)"
+                      class="w-4 h-4 text-xs font-bold rounded flex items-center justify-center"
+                      :class="getSetTypeBadgeClass(set.set_type)"
+                      :title="set.set_type"
+                    >
+                      {{ getSetTypeLabel(set.set_type) }}
+                    </span>
+                  </div>
+                  <div class="col-span-4">
+                    <NInputNumber
+                      v-model:value="set.weight"
+                      :min="0"
+                      :max="500"
+                      :precision="1"
+                      placeholder="0"
+                      size="small"
+                    />
+                  </div>
+                  <div class="col-span-4">
+                    <NInputNumber
+                      v-model:value="set.reps"
+                      :min="0"
+                      :max="100"
+                      placeholder="0"
+                      size="small"
+                    />
+                  </div>
+                  <div class="col-span-2 flex justify-center">
+                    <NButton
+                      size="tiny"
+                      quaternary
+                      :disabled="member.exercise.sets.length <= 1"
+                      @click="removeSet(member.index, setIndex)"
+                    >
+                      <svg class="w-4 h-4 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </NButton>
+                  </div>
+                </div>
+
+                <div class="flex gap-2">
+                  <NButton size="small" dashed class="flex-1" @click="addSet(member.index)">
+                    <template #icon>
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </template>
+                    Add Set
+                  </NButton>
+                  <NButton
+                    size="small"
+                    dashed
+                    class="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                    @click="addDropSet(member.index)"
+                  >
+                    <template #icon>
+                      <span class="font-bold">D</span>
+                    </template>
+                    Drop Set
+                  </NButton>
+                </div>
+              </div>
+            </NCard>
+          </ExerciseGroup>
+
+          <!-- Standalone Exercise -->
+          <NCard v-else>
+            <template #header>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                    <span class="font-bold text-sm text-indigo-600 dark:text-indigo-400">{{ entry.index + 1 }}</span>
+                  </div>
+                  <h3 class="font-semibold text-gray-900 dark:text-white">{{ entry.exercise.name }}</h3>
+                </div>
+                <div class="flex items-center gap-1">
+                  <NButton
+                    v-if="entry.index < exercises.length - 1"
+                    size="tiny"
+                    quaternary
+                    title="Link with next exercise"
+                    @click="linkWithNext(entry.index)"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </NButton>
+                  <NButton size="tiny" quaternary :disabled="entry.index === 0" @click="moveExerciseUp(entry.index)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                    </svg>
+                  </NButton>
+                  <NButton size="tiny" quaternary :disabled="entry.index === exercises.length - 1" @click="moveExerciseDown(entry.index)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </NButton>
+                  <NButton size="tiny" quaternary type="error" @click="removeExercise(entry.index)">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </NButton>
+                </div>
+              </div>
+            </template>
+
+            <!-- Cardio Input for cardio exercises -->
+            <div v-if="entry.exercise.category === 'cardio' && entry.exercise.cardio" class="space-y-3">
+              <CardioInput
+                :exercise-index="entry.index"
+                :tracking-type="entry.exercise.trackingType || 'duration'"
+                :cardio-log="{
+                  duration_sec: entry.exercise.cardio.duration_sec,
+                  distance_km: entry.exercise.cardio.distance_km,
+                  calories: entry.exercise.cardio.calories,
+                }"
+                @update="(data) => handleCardioUpdate(entry.index, data)"
+                @complete="handleCardioComplete(entry.index)"
+                @remove="handleCardioRemove(entry.index)"
+              />
+              <div v-if="entry.exercise.cardio.completed" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                  <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clip-rule="evenodd" />
+                </svg>
+                <span class="text-sm font-medium text-green-700 dark:text-green-300">Completed</span>
               </div>
             </div>
 
-            <div class="flex gap-2">
-              <NButton size="small" dashed class="flex-1" @click="addSet(exIndex)">
-                <template #icon>
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                  </svg>
-                </template>
-                Add Set
-              </NButton>
-              <NButton
-                size="small"
-                dashed
-                class="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                @click="addDropSet(exIndex)"
+            <!-- Sets Table for strength exercises -->
+            <div v-else class="space-y-3">
+              <div class="grid grid-cols-12 gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 px-1">
+                <div class="col-span-2">Set</div>
+                <div class="col-span-4">Weight (kg)</div>
+                <div class="col-span-4">Reps</div>
+                <div class="col-span-2"></div>
+              </div>
+
+              <div
+                v-for="(set, setIndex) in entry.exercise.sets"
+                :key="setIndex"
+                class="grid grid-cols-12 gap-2 items-center rounded-lg p-1 transition-colors"
+                :class="isDropSet(set.set_type) ? 'bg-amber-50/50 dark:bg-amber-900/10 ml-3 border-l-2 border-amber-400' : ''"
               >
-                <template #icon>
-                  <span class="font-bold">D</span>
-                </template>
-                Drop Set
-              </NButton>
+                <div class="col-span-2 text-center font-medium text-gray-700 dark:text-gray-300 flex items-center justify-center gap-1">
+                  <span>{{ setIndex + 1 }}</span>
+                  <span
+                    v-if="getSetTypeLabel(set.set_type)"
+                    class="w-4 h-4 text-xs font-bold rounded flex items-center justify-center"
+                    :class="getSetTypeBadgeClass(set.set_type)"
+                    :title="set.set_type"
+                  >
+                    {{ getSetTypeLabel(set.set_type) }}
+                  </span>
+                </div>
+                <div class="col-span-4">
+                  <NInputNumber
+                    v-model:value="set.weight"
+                    :min="0"
+                    :max="500"
+                    :precision="1"
+                    placeholder="0"
+                    size="small"
+                  />
+                </div>
+                <div class="col-span-4">
+                  <NInputNumber
+                    v-model:value="set.reps"
+                    :min="0"
+                    :max="100"
+                    placeholder="0"
+                    size="small"
+                  />
+                </div>
+                <div class="col-span-2 flex justify-center">
+                  <NButton
+                    size="tiny"
+                    quaternary
+                    :disabled="entry.exercise.sets.length <= 1"
+                    @click="removeSet(entry.index, setIndex)"
+                  >
+                    <svg class="w-4 h-4 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </NButton>
+                </div>
+              </div>
+
+              <div class="flex gap-2">
+                <NButton size="small" dashed class="flex-1" @click="addSet(entry.index)">
+                  <template #icon>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </template>
+                  Add Set
+                </NButton>
+                <NButton
+                  size="small"
+                  dashed
+                  class="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                  @click="addDropSet(entry.index)"
+                >
+                  <template #icon>
+                    <span class="font-bold">D</span>
+                  </template>
+                  Drop Set
+                </NButton>
+              </div>
             </div>
-          </div>
-        </NCard>
+          </NCard>
+        </template>
       </div>
 
       <!-- Summary -->

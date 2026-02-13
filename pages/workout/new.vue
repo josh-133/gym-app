@@ -3,6 +3,7 @@ import { NCard, NButton, NInput, NModal, NEmpty, NTabs, NTabPane, NDatePicker, N
 import type { Exercise } from '~/types/database'
 import RestTimer from '~/components/workout/RestTimer.vue'
 import CardioInput from '~/components/workout/CardioInput.vue'
+import ExerciseGroup from '~/components/workout/ExerciseGroup.vue'
 import { EXERCISE_LIBRARY, type CardioTrackingType } from '~/utils/exercises'
 
 definePageMeta({
@@ -151,9 +152,15 @@ function startFromTemplate(template: typeof templates.value[0]) {
   workoutStore.startWorkout(template.name)
   // Mark template as used
   markTemplateUsed(template.id)
+  // Get the raw template to access group data
+  const rawTemplate = savedTemplates.value.find(t => t.id === template.id)
   // Add all exercises from the template
-  template.exercises.forEach(exercise => {
-    workoutStore.addExercise(exercise)
+  template.exercises.forEach((exercise, i) => {
+    const rawEx = rawTemplate?.exercises[i]
+    const groupOptions = rawEx?.group_id && rawEx?.group_type
+      ? { groupId: rawEx.group_id, groupType: rawEx.group_type as 'superset' | 'circuit' }
+      : undefined
+    workoutStore.addExercise(exercise, groupOptions)
     // Add 3 default sets for each exercise
     const exerciseIndex = workoutStore.exerciseLogs.length - 1
     workoutStore.addSet(exerciseIndex)
@@ -255,6 +262,8 @@ async function confirmFinishWorkout() {
           calories: log.cardio_log.calories_burned || undefined,
           completed: !!log.cardio_log.completed_at,
         } : undefined,
+        group_id: log.group_id,
+        group_type: log.group_type,
       })),
       volume,
       rating: null,
@@ -270,6 +279,8 @@ async function confirmFinishWorkout() {
           sets: log.sets.length || 1,
           defaultReps: log.sets.find(s => s.reps)?.reps || undefined,
           defaultWeight: log.sets.find(s => s.weight_kg)?.weight_kg || undefined,
+          group_id: log.group_id,
+          group_type: log.group_type,
         })),
       })
     }
@@ -499,11 +510,124 @@ onMounted(() => {
 
       <!-- Exercise List -->
       <div class="space-y-4">
-        <div
-          v-for="(log, index) in workoutStore.exerciseLogs"
-          :key="log.id"
-        >
-          <NCard>
+        <template v-for="entry in workoutStore.groupedExerciseLogs" :key="entry.type === 'group' ? entry.groupId : entry.exercise.id">
+          <!-- Grouped Exercises -->
+          <ExerciseGroup
+            v-if="entry.type === 'group'"
+            :group-type="entry.groupType"
+            :exercise-count="entry.exercises.length"
+            @dissolve="workoutStore.dissolveGroup(entry.groupId)"
+          >
+            <div v-for="(member, memberIdx) in entry.exercises" :key="member.log.id">
+              <NCard>
+                <template #header>
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-md">
+                        <span class="text-white font-bold text-sm">{{ String.fromCharCode(65 + memberIdx) }}</span>
+                      </div>
+                      <div>
+                        <h3 class="font-semibold text-gray-900 dark:text-white">
+                          {{ member.log.exercise.name }}
+                        </h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          {{ formatMuscleGroups(member.log.exercise.muscle_groups) }}
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                      <!-- Link with next (only if not last in list) -->
+                      <NButton
+                        v-if="member.exerciseIndex < workoutStore.exerciseLogs.length - 1"
+                        quaternary
+                        circle
+                        size="small"
+                        title="Link with next exercise"
+                        @click="workoutStore.linkWithNext(member.exerciseIndex)"
+                      >
+                        <template #icon>
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                        </template>
+                      </NButton>
+                      <!-- Unlink from group -->
+                      <NButton quaternary circle size="small" title="Remove from group" @click="workoutStore.removeFromGroup(member.exerciseIndex)">
+                        <template #icon>
+                          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </template>
+                      </NButton>
+                      <NButton quaternary circle size="small" @click="removeExercise(member.exerciseIndex)">
+                        <template #icon>
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </template>
+                      </NButton>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Cardio Input -->
+                <div v-if="member.log.exercise.category === 'cardio'" class="space-y-2">
+                  <CardioInput
+                    :exercise-index="member.exerciseIndex"
+                    :tracking-type="getExerciseTrackingType(member.log.exercise.name) || 'duration'"
+                    :cardio-log="{
+                      duration_sec: member.log.cardio_log?.duration_sec || null,
+                      distance_km: member.log.cardio_log?.distance_km || null,
+                      calories: member.log.cardio_log?.calories_burned || null,
+                    }"
+                    @update="(data) => handleCardioUpdate(member.exerciseIndex, data)"
+                    @complete="handleCardioComplete(member.exerciseIndex)"
+                    @remove="removeExercise(member.exerciseIndex)"
+                  />
+                  <div v-if="member.log.cardio_log?.completed_at" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span class="text-sm text-green-700 dark:text-green-300">Completed</span>
+                  </div>
+                </div>
+
+                <!-- Strength Sets -->
+                <div v-else class="space-y-2">
+                  <div class="grid grid-cols-12 gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 px-2">
+                    <div class="col-span-1">Set</div>
+                    <div class="col-span-3">Previous</div>
+                    <div class="col-span-3">Weight</div>
+                    <div class="col-span-3">Reps</div>
+                    <div class="col-span-2"></div>
+                  </div>
+
+                  <WorkoutSetInput
+                    v-for="(set, setIndex) in member.log.sets"
+                    :key="setIndex"
+                    :set="set"
+                    :set-index="setIndex"
+                    :exercise-index="member.exerciseIndex"
+                    :exercise-name="member.log.exercise.name"
+                    :previous-sets="getLastPerformedSets(member.log.exercise.name)"
+                    @add-drop-set="(setIdx: number) => workoutStore.addDropSet(member.exerciseIndex, setIdx)"
+                  />
+
+                  <NButton dashed block @click="workoutStore.addSet(member.exerciseIndex)">
+                    <template #icon>
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </template>
+                    Add Set
+                  </NButton>
+                </div>
+              </NCard>
+            </div>
+          </ExerciseGroup>
+
+          <!-- Standalone Exercise -->
+          <NCard v-else>
             <template #header>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
@@ -514,38 +638,55 @@ onMounted(() => {
                   </div>
                   <div>
                     <h3 class="font-semibold text-gray-900 dark:text-white">
-                      {{ log.exercise.name }}
+                      {{ entry.exercise.exercise.name }}
                     </h3>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                      {{ formatMuscleGroups(log.exercise.muscle_groups) }}
+                      {{ formatMuscleGroups(entry.exercise.exercise.muscle_groups) }}
                     </p>
                   </div>
                 </div>
-                <NButton quaternary circle @click="removeExercise(index)">
-                  <template #icon>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </template>
-                </NButton>
+                <div class="flex items-center gap-1">
+                  <!-- Link with next button -->
+                  <NButton
+                    v-if="entry.exerciseIndex < workoutStore.exerciseLogs.length - 1"
+                    quaternary
+                    circle
+                    size="small"
+                    title="Link with next exercise"
+                    @click="workoutStore.linkWithNext(entry.exerciseIndex)"
+                  >
+                    <template #icon>
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                    </template>
+                  </NButton>
+                  <NButton quaternary circle @click="removeExercise(entry.exerciseIndex)">
+                    <template #icon>
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </template>
+                  </NButton>
+                </div>
               </div>
             </template>
 
             <!-- Cardio Input -->
-            <div v-if="log.exercise.category === 'cardio'" class="space-y-2">
+            <div v-if="entry.exercise.exercise.category === 'cardio'" class="space-y-2">
               <CardioInput
-                :exercise-index="index"
-                :tracking-type="getExerciseTrackingType(log.exercise.name) || 'duration'"
+                :exercise-index="entry.exerciseIndex"
+                :tracking-type="getExerciseTrackingType(entry.exercise.exercise.name) || 'duration'"
                 :cardio-log="{
-                  duration_sec: log.cardio_log?.duration_sec || null,
-                  distance_km: log.cardio_log?.distance_km || null,
-                  calories: log.cardio_log?.calories_burned || null,
+                  duration_sec: entry.exercise.cardio_log?.duration_sec || null,
+                  distance_km: entry.exercise.cardio_log?.distance_km || null,
+                  calories: entry.exercise.cardio_log?.calories_burned || null,
                 }"
-                @update="(data) => handleCardioUpdate(index, data)"
-                @complete="handleCardioComplete(index)"
-                @remove="removeExercise(index)"
+                @update="(data) => handleCardioUpdate(entry.exerciseIndex, data)"
+                @complete="handleCardioComplete(entry.exerciseIndex)"
+                @remove="removeExercise(entry.exerciseIndex)"
               />
-              <div v-if="log.cardio_log?.completed_at" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div v-if="entry.exercise.cardio_log?.completed_at" class="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
@@ -555,7 +696,6 @@ onMounted(() => {
 
             <!-- Strength Sets -->
             <div v-else class="space-y-2">
-              <!-- Set Headers -->
               <div class="grid grid-cols-12 gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 px-2">
                 <div class="col-span-1">Set</div>
                 <div class="col-span-3">Previous</div>
@@ -564,24 +704,18 @@ onMounted(() => {
                 <div class="col-span-2"></div>
               </div>
 
-              <!-- Set Rows -->
               <WorkoutSetInput
-                v-for="(set, setIndex) in log.sets"
+                v-for="(set, setIndex) in entry.exercise.sets"
                 :key="setIndex"
                 :set="set"
                 :set-index="setIndex"
-                :exercise-index="index"
-                :exercise-name="log.exercise.name"
-                :previous-sets="getLastPerformedSets(log.exercise.name)"
-                @add-drop-set="(setIdx: number) => workoutStore.addDropSet(index, setIdx)"
+                :exercise-index="entry.exerciseIndex"
+                :exercise-name="entry.exercise.exercise.name"
+                :previous-sets="getLastPerformedSets(entry.exercise.exercise.name)"
+                @add-drop-set="(setIdx: number) => workoutStore.addDropSet(entry.exerciseIndex, setIdx)"
               />
 
-              <!-- Add Set Button -->
-              <NButton
-                dashed
-                block
-                @click="workoutStore.addSet(index)"
-              >
+              <NButton dashed block @click="workoutStore.addSet(entry.exerciseIndex)">
                 <template #icon>
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -591,7 +725,7 @@ onMounted(() => {
               </NButton>
             </div>
           </NCard>
-        </div>
+        </template>
 
         <!-- Add Exercise Button -->
         <NButton

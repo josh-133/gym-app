@@ -6,6 +6,8 @@ interface WorkoutTemplate {
     sets: number
     defaultWeight?: number
     defaultReps?: number
+    group_id?: string | null
+    group_type?: 'superset' | 'circuit' | null
   }[]
   createdAt: string
   lastUsed: string | null

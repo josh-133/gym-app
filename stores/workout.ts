@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { WorkoutSession, ExerciseLog, Set, Exercise, CardioLog } from '~/types/database'
+import type { WorkoutSession, ExerciseLog, Set, Exercise, CardioLog, ExerciseGroupType } from '~/types/database'
 
 const STORAGE_KEY = 'gym-app-active-workout'
 
@@ -31,6 +31,19 @@ interface ActiveExerciseLog {
   sets: ActiveSet[]
   cardio_log: Partial<CardioLog> | null
   notes: string
+  group_id: string | null
+  group_type: ExerciseGroupType | null
+}
+
+export type ExerciseGroupEntry = {
+  type: 'standalone'
+  exercise: ActiveExerciseLog
+  exerciseIndex: number
+} | {
+  type: 'group'
+  groupId: string
+  groupType: ExerciseGroupType
+  exercises: { log: ActiveExerciseLog; exerciseIndex: number }[]
 }
 
 interface WorkoutState {
@@ -88,6 +101,31 @@ export const useWorkoutStore = defineStore('workout', {
       if (!state.restTimerEndAt) return 0
       return Math.max(0, Math.floor((state.restTimerEndAt.getTime() - Date.now()) / 1000))
     },
+
+    groupedExerciseLogs: (state): ExerciseGroupEntry[] => {
+      const entries: ExerciseGroupEntry[] = []
+      const seenGroupIds = new Set<string>()
+
+      for (let i = 0; i < state.exerciseLogs.length; i++) {
+        const log = state.exerciseLogs[i]
+        if (log.group_id) {
+          if (seenGroupIds.has(log.group_id)) continue
+          seenGroupIds.add(log.group_id)
+          const groupMembers = state.exerciseLogs
+            .map((l, idx) => ({ log: l, exerciseIndex: idx }))
+            .filter(item => item.log.group_id === log.group_id)
+          entries.push({
+            type: 'group',
+            groupId: log.group_id,
+            groupType: log.group_type || 'superset',
+            exercises: groupMembers,
+          })
+        } else {
+          entries.push({ type: 'standalone', exercise: log, exerciseIndex: i })
+        }
+      }
+      return entries
+    },
   },
 
   actions: {
@@ -134,7 +172,7 @@ export const useWorkoutStore = defineStore('workout', {
       }
     },
 
-    addExercise(exercise: Exercise) {
+    addExercise(exercise: Exercise, options?: { groupId?: string; groupType?: ExerciseGroupType }) {
       const log: ActiveExerciseLog = {
         id: crypto.randomUUID(),
         exercise,
@@ -142,16 +180,27 @@ export const useWorkoutStore = defineStore('workout', {
         sets: [],
         cardio_log: exercise.category === 'cardio' ? {} : null,
         notes: '',
+        group_id: options?.groupId ?? null,
+        group_type: options?.groupType ?? null,
       }
       this.exerciseLogs.push(log)
       this.persistState()
     },
 
     removeExercise(index: number) {
+      const removed = this.exerciseLogs[index]
+      const groupId = removed?.group_id
       this.exerciseLogs.splice(index, 1)
       this.exerciseLogs.forEach((log, i) => {
         log.order_index = i
       })
+      // Auto-dissolve group if fewer than 2 members remain
+      if (groupId) {
+        const remaining = this.exerciseLogs.filter(l => l.group_id === groupId)
+        if (remaining.length < 2) {
+          remaining.forEach(l => { l.group_id = null; l.group_type = null })
+        }
+      }
       this.persistState()
     },
 
@@ -281,6 +330,86 @@ export const useWorkoutStore = defineStore('workout', {
 
     cancelRestTimer() {
       this.restTimerEndAt = null
+      this.persistState()
+    },
+
+    linkWithNext(exerciseIndex: number) {
+      const current = this.exerciseLogs[exerciseIndex]
+      const next = this.exerciseLogs[exerciseIndex + 1]
+      if (!current || !next) return
+
+      const existingGroupId = current.group_id || next.group_id
+      const groupId = existingGroupId || crypto.randomUUID()
+
+      // If current is already in a group, add next to that group
+      if (current.group_id && !next.group_id) {
+        next.group_id = current.group_id
+        next.group_type = current.group_type
+      }
+      // If next is already in a group, add current to that group
+      else if (!current.group_id && next.group_id) {
+        current.group_id = next.group_id
+        current.group_type = next.group_type
+      }
+      // Neither in a group - create new superset
+      else if (!current.group_id && !next.group_id) {
+        current.group_id = groupId
+        current.group_type = 'superset'
+        next.group_id = groupId
+        next.group_type = 'superset'
+      }
+      // Both already in the same group - nothing to do
+      else if (current.group_id === next.group_id) {
+        return
+      }
+      // Both in different groups - merge into current's group
+      else {
+        const targetGroupId = current.group_id!
+        const sourceGroupId = next.group_id!
+        this.exerciseLogs.forEach(l => {
+          if (l.group_id === sourceGroupId) {
+            l.group_id = targetGroupId
+          }
+        })
+      }
+
+      // Auto-upgrade: determine group type based on member count
+      const finalGroupId = current.group_id!
+      const members = this.exerciseLogs.filter(l => l.group_id === finalGroupId)
+      const groupType: ExerciseGroupType = members.length >= 3 ? 'circuit' : 'superset'
+      members.forEach(l => { l.group_type = groupType })
+
+      this.persistState()
+    },
+
+    removeFromGroup(exerciseIndex: number) {
+      const log = this.exerciseLogs[exerciseIndex]
+      if (!log || !log.group_id) return
+
+      const groupId = log.group_id
+      log.group_id = null
+      log.group_type = null
+
+      // Check remaining members
+      const remaining = this.exerciseLogs.filter(l => l.group_id === groupId)
+      if (remaining.length < 2) {
+        remaining.forEach(l => { l.group_id = null; l.group_type = null })
+      } else {
+        // Downgrade from circuit to superset if only 2 remain
+        const groupType: ExerciseGroupType = remaining.length >= 3 ? 'circuit' : 'superset'
+        remaining.forEach(l => { l.group_type = groupType })
+      }
+
+      this.persistState()
+    },
+
+    dissolveGroup(groupId: string) {
+      this.exerciseLogs.forEach(l => {
+        if (l.group_id === groupId) {
+          l.group_id = null
+          l.group_type = null
+        }
+      })
       this.persistState()
     },
 
