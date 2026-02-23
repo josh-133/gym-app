@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { NCard, NButton, NForm, NFormItem, NInput, NSelect, NAvatar, NTabs, NTabPane, NDivider, NSwitch, NTag, NModal } from 'naive-ui'
 import PremiumBadge from '~/components/subscription/PremiumBadge.vue'
+import { workoutsToCSV, downloadCSV } from '~/utils/csvExport'
 
 definePageMeta({
   middleware: ['auth'],
@@ -179,8 +180,23 @@ async function handleSignOut() {
   await navigateTo('/login')
 }
 
-// Export all user data as JSON
+// Export all user data
 const isExporting = ref(false)
+const isExportingCSV = ref(false)
+
+async function exportCSV() {
+  isExportingCSV.value = true
+  try {
+    const csv = workoutsToCSV(workouts.value as any)
+    downloadCSV(csv, `workout-history-${new Date().toISOString().split('T')[0]}.csv`)
+    notification.success('CSV exported successfully!')
+  } catch (error) {
+    console.error('CSV export error:', error)
+    notification.error('Failed to export CSV.')
+  } finally {
+    isExportingCSV.value = false
+  }
+}
 
 async function exportData() {
   isExporting.value = true
@@ -365,21 +381,61 @@ async function exportData() {
 
           <!-- Data Export -->
           <NCard title="Your Data">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-white">Export as JSON</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Full data export including profile, measurements, and goals
+                  </p>
+                </div>
+                <NButton :loading="isExporting" @click="exportData">
+                  <template #icon>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </template>
+                  JSON
+                </NButton>
+              </div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-white">Export as CSV</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Workout history as spreadsheet (one row per set)
+                  </p>
+                </div>
+                <NButton :loading="isExportingCSV" @click="exportCSV">
+                  <template #icon>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </template>
+                  CSV
+                </NButton>
+              </div>
+            </div>
+          </NCard>
+
+          <!-- Import Data -->
+          <NCard title="Import Data">
             <div class="flex items-center justify-between">
               <div>
-                <p class="font-medium text-gray-900 dark:text-white">Export Data</p>
+                <p class="font-medium text-gray-900 dark:text-white">Import from Other Apps</p>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                  Download all your workout history, measurements, and goals as JSON
+                  Import workout history from Strong, Hevy, or FitNotes
                 </p>
               </div>
-              <NButton :loading="isExporting" @click="exportData">
-                <template #icon>
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                </template>
-                Export
-              </NButton>
+              <NuxtLink to="/settings/import">
+                <NButton>
+                  <template #icon>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  </template>
+                  Import
+                </NButton>
+              </NuxtLink>
             </div>
           </NCard>
 

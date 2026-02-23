@@ -17,7 +17,6 @@ ALTER TABLE public.personal_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.body_measurements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.ai_insights ENABLE ROW LEVEL SECURITY;
 
 -- ============================================
 -- PROFILES POLICIES
@@ -357,22 +356,6 @@ CREATE POLICY "Users can update own body measurements"
 
 CREATE POLICY "Users can delete own body measurements"
   ON public.body_measurements FOR DELETE
-  USING (auth.uid() = user_id);
-
--- ============================================
--- AI INSIGHTS POLICIES
--- ============================================
-
-CREATE POLICY "Users can view own ai insights"
-  ON public.ai_insights FOR SELECT
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own ai insights"
-  ON public.ai_insights FOR UPDATE
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own ai insights"
-  ON public.ai_insights FOR DELETE
   USING (auth.uid() = user_id);
 
 -- ============================================

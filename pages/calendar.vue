@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NButton, NModal } from 'naive-ui'
+import { NButton, NModal, NSelect, NInput } from 'naive-ui'
 
 definePageMeta({
   middleware: ['auth'],
@@ -7,6 +7,8 @@ definePageMeta({
 
 const { workouts, loadWorkouts } = useWorkoutHistory()
 const { formatVolume } = useUnits()
+const { scheduledWorkouts, fetchSchedule, scheduleWorkout, deleteScheduled } = useSchedule()
+const { templates, loadTemplates } = useTemplates()
 
 // Current displayed month
 const currentDate = ref(new Date())
@@ -99,11 +101,52 @@ const selectedDayWorkouts = computed(() => {
   return getWorkoutsForDate(selectedDate.value)
 })
 
+// Scheduled workouts by date
+const scheduledByDate = computed(() => {
+  const map = new Map<string, typeof scheduledWorkouts.value>()
+  scheduledWorkouts.value.forEach(sw => {
+    const dateKey = new Date(sw.scheduled_date).toDateString()
+    if (!map.has(dateKey)) map.set(dateKey, [])
+    map.get(dateKey)!.push(sw)
+  })
+  return map
+})
+
+function hasScheduled(date: Date) {
+  return scheduledByDate.value.has(date.toDateString())
+}
+
+function getScheduledForDate(date: Date) {
+  return scheduledByDate.value.get(date.toDateString()) || []
+}
+
+// Schedule workout modal
+const showScheduleModal = ref(false)
+const scheduleForm = ref({ templateId: null as string | null, notes: '' })
+
+const templateOptions = computed(() =>
+  templates.value.map(t => ({ label: t.name, value: t.id }))
+)
+
+async function handleSchedule() {
+  if (!selectedDate.value || !scheduleForm.value.templateId) return
+  const dateStr = selectedDate.value.toISOString().split('T')[0]
+  await scheduleWorkout({
+    templateId: scheduleForm.value.templateId,
+    scheduledDate: dateStr,
+    notes: scheduleForm.value.notes || undefined,
+  })
+  showScheduleModal.value = false
+  scheduleForm.value = { templateId: null, notes: '' }
+}
+
+async function handleDeleteScheduled(id: string) {
+  await deleteScheduled(id)
+}
+
 function selectDate(date: Date) {
   selectedDate.value = date
-  if (hasWorkout(date)) {
-    showDayModal.value = true
-  }
+  showDayModal.value = true
 }
 
 function formatDuration(seconds: number) {
@@ -169,8 +212,8 @@ const currentStreak = computed(() => {
   return streak
 })
 
-onMounted(() => {
-  loadWorkouts()
+onMounted(async () => {
+  await Promise.all([loadWorkouts(), loadTemplates(), fetchSchedule()])
 })
 </script>
 
@@ -261,15 +304,20 @@ onMounted(() => {
         >
           <span class="text-sm font-medium">{{ day.date.getDate() }}</span>
 
-          <!-- Workout Indicator -->
+          <!-- Workout/Scheduled Indicator -->
           <div
-            v-if="hasWorkout(day.date) && day.isCurrentMonth"
+            v-if="(hasWorkout(day.date) || hasScheduled(day.date)) && day.isCurrentMonth"
             class="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5"
           >
             <div
               v-for="(_, i) in Math.min(getWorkoutsForDate(day.date).length, 3)"
-              :key="i"
+              :key="'c-' + i"
               class="w-1.5 h-1.5 rounded-full bg-accent-500"
+            ></div>
+            <div
+              v-for="(_, i) in Math.min(getScheduledForDate(day.date).filter(s => !s.completed_session_id).length, 2)"
+              :key="'s-' + i"
+              class="w-1.5 h-1.5 rounded-full bg-gray-400"
             ></div>
           </div>
         </button>
@@ -284,7 +332,11 @@ onMounted(() => {
       </div>
       <div class="flex items-center gap-2">
         <div class="w-3 h-3 rounded-full bg-accent-500"></div>
-        <span>Workout day</span>
+        <span>Completed</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-3 h-3 rounded-full bg-gray-400"></div>
+        <span>Scheduled</span>
       </div>
     </div>
 
@@ -331,20 +383,85 @@ onMounted(() => {
           </NuxtLink>
         </div>
 
-        <div v-if="selectedDayWorkouts.length === 0" class="text-center py-8">
+        <!-- Scheduled Workouts -->
+        <div v-if="selectedDate && getScheduledForDate(selectedDate).length > 0" class="space-y-2">
+          <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Scheduled</p>
+          <div
+            v-for="sw in getScheduledForDate(selectedDate)"
+            :key="sw.id"
+            class="p-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-600"
+            :class="sw.completed_session_id ? 'opacity-50' : ''"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ templates.find(t => t.id === sw.template_id)?.name || 'Workout' }}
+                </p>
+                <p v-if="sw.notes" class="text-xs text-gray-400 mt-0.5">{{ sw.notes }}</p>
+                <p v-if="sw.completed_session_id" class="text-xs text-green-500 mt-0.5">Completed</p>
+              </div>
+              <div class="flex gap-1">
+                <NuxtLink v-if="!sw.completed_session_id && sw.template_id" :to="`/workout/new?template=${sw.template_id}`">
+                  <NButton size="small" type="primary">Start</NButton>
+                </NuxtLink>
+                <NButton size="small" quaternary @click="handleDeleteScheduled(sw.id)">
+                  <template #icon>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </template>
+                </NButton>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="selectedDayWorkouts.length === 0 && (!selectedDate || getScheduledForDate(selectedDate).length === 0)" class="text-center py-8">
           <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
             <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h2m12 0h2M6 7v10M18 7v10M8 7h8M8 17h8M4 17h2m12 0h2" />
             </svg>
           </div>
           <p class="text-gray-500 dark:text-gray-400">No workouts on this day</p>
-          <NuxtLink to="/workout/new" class="inline-block mt-3">
-            <NButton type="primary" size="small" class="!rounded-full">
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+          <NuxtLink to="/workout/new" class="flex-1">
+            <NButton type="primary" block size="small" class="!rounded-full">
               Start Workout
             </NButton>
           </NuxtLink>
+          <NButton size="small" class="!rounded-full" @click="showDayModal = false; showScheduleModal = true">
+            Schedule
+          </NButton>
         </div>
       </div>
+    </NModal>
+
+    <!-- Schedule Workout Modal -->
+    <NModal v-model:show="showScheduleModal" preset="card" title="Schedule Workout" :style="{ width: '90%', maxWidth: '400px' }">
+      <div class="space-y-4">
+        <p class="text-sm text-gray-500">
+          Schedule for {{ selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) }}
+        </p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Template</label>
+          <NSelect v-model:value="scheduleForm.templateId" :options="templateOptions" placeholder="Select a template" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notes (optional)</label>
+          <NInput v-model:value="scheduleForm.notes" placeholder="Any notes..." />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex gap-3">
+          <NButton class="flex-1" @click="showScheduleModal = false">Cancel</NButton>
+          <NButton type="primary" class="flex-1" :disabled="!scheduleForm.templateId" @click="handleSchedule">
+            Schedule
+          </NButton>
+        </div>
+      </template>
     </NModal>
   </div>
 </template>

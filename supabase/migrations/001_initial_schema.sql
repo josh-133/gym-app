@@ -263,26 +263,6 @@ CREATE INDEX idx_body_measurements_user ON public.body_measurements(user_id);
 CREATE INDEX idx_body_measurements_user_date ON public.body_measurements(user_id, measured_at DESC);
 
 -- ============================================
--- AI INSIGHTS TABLE
--- ============================================
-
-CREATE TABLE public.ai_insights (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  insight_type TEXT NOT NULL CHECK (insight_type IN ('recommendation', 'analysis', 'warning', 'celebration')),
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  related_exercise_id UUID REFERENCES public.exercises(id),
-  is_read BOOLEAN DEFAULT false,
-  is_dismissed BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ
-);
-
-CREATE INDEX idx_ai_insights_user ON public.ai_insights(user_id);
-CREATE INDEX idx_ai_insights_user_unread ON public.ai_insights(user_id) WHERE is_read = false AND is_dismissed = false;
-
--- ============================================
 -- UPDATED_AT TRIGGER
 -- ============================================
 

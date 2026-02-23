@@ -8,9 +8,11 @@ interface WorkoutTemplate {
     defaultReps?: number
     group_id?: string | null
     group_type?: 'superset' | 'circuit' | null
+    default_rest_sec?: number | null
   }[]
   createdAt: string
   lastUsed: string | null
+  folder?: string | null
 }
 
 const STORAGE_KEY = 'gym-app-workout-templates'
@@ -31,6 +33,7 @@ function getDefaultTemplates(): WorkoutTemplate[] {
       ],
       createdAt: new Date().toISOString(),
       lastUsed: null,
+      folder: null,
     },
     {
       id: 'pull-day',
@@ -44,6 +47,7 @@ function getDefaultTemplates(): WorkoutTemplate[] {
       ],
       createdAt: new Date().toISOString(),
       lastUsed: null,
+      folder: null,
     },
     {
       id: 'leg-day',
@@ -59,6 +63,7 @@ function getDefaultTemplates(): WorkoutTemplate[] {
       ],
       createdAt: new Date().toISOString(),
       lastUsed: null,
+      folder: null,
     },
     {
       id: 'full-body',
@@ -77,6 +82,7 @@ function getDefaultTemplates(): WorkoutTemplate[] {
       ],
       createdAt: new Date().toISOString(),
       lastUsed: null,
+      folder: null,
     },
   ]
 }
@@ -97,7 +103,6 @@ export function useTemplates() {
           saveTemplates()
         }
       } else {
-        // Initialize with default templates
         templates.value = getDefaultTemplates()
         saveTemplates()
       }
@@ -155,6 +160,59 @@ export function useTemplates() {
     }
   }
 
+  // Folder management
+  const folders = computed(() => {
+    const folderSet = new Set<string>()
+    templates.value.forEach(t => {
+      if (t.folder) folderSet.add(t.folder)
+    })
+    return Array.from(folderSet).sort()
+  })
+
+  function createFolder(name: string) {
+    // Folders are implicit - just assign a template to one
+    return name
+  }
+
+  function moveToFolder(templateId: string, folder: string | null) {
+    const template = templates.value.find(t => t.id === templateId)
+    if (template) {
+      template.folder = folder
+      saveTemplates()
+    }
+  }
+
+  function deleteFolder(folderName: string) {
+    templates.value.forEach(t => {
+      if (t.folder === folderName) {
+        t.folder = null
+      }
+    })
+    saveTemplates()
+  }
+
+  function renameFolder(oldName: string, newName: string) {
+    templates.value.forEach(t => {
+      if (t.folder === oldName) {
+        t.folder = newName
+      }
+    })
+    saveTemplates()
+  }
+
+  // Templates grouped by folder
+  const templatesByFolder = computed(() => {
+    const grouped: Record<string, WorkoutTemplate[]> = { '': [] }
+
+    templates.value.forEach(t => {
+      const folder = t.folder || ''
+      if (!grouped[folder]) grouped[folder] = []
+      grouped[folder].push(t)
+    })
+
+    return grouped
+  })
+
   // Initialize on mount
   onMounted(() => {
     loadTemplates()
@@ -168,5 +226,12 @@ export function useTemplates() {
     updateTemplate,
     deleteTemplate,
     markTemplateUsed,
+    // Folder management
+    folders,
+    createFolder,
+    moveToFolder,
+    deleteFolder,
+    renameFolder,
+    templatesByFolder,
   }
 }

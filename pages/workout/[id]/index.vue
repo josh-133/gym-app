@@ -3,6 +3,7 @@ import { NCard, NButton, NTag, NEmpty, NModal } from 'naive-ui'
 import { EXERCISE_LIBRARY, type CardioTrackingType } from '~/utils/exercises'
 import type { Exercise, ExerciseGroupType } from '~/types/database'
 import ExerciseGroup from '~/components/workout/ExerciseGroup.vue'
+import { generateWorkoutCard, shareWorkoutCard } from '~/utils/workoutCard'
 
 definePageMeta({
   middleware: ['auth'],
@@ -296,6 +297,39 @@ function getExerciseFromName(name: string): Exercise | null {
   }
 }
 
+// Share workout as image card
+const sharing = ref(false)
+async function shareWorkout() {
+  if (!workout.value) return
+  sharing.value = true
+  try {
+    const cardData = {
+      name: workout.value.name,
+      date: workout.value.started_at,
+      duration: workout.value.duration_sec,
+      exerciseCount: workout.value.exercises.length,
+      totalVolume: totalVolume.value,
+      totalSets: totalSets.value,
+      prs: workout.value.exercises
+        .flatMap(ex => ex.sets.filter(s => s.is_pr).map(s => `${ex.name}: ${s.weight}kg x ${s.reps}`)),
+      exercises: workout.value.exercises.map(ex => ({
+        name: ex.name,
+        bestSet: ex.cardio
+          ? `${Math.round(ex.cardio.duration_sec / 60)}min`
+          : ex.sets.length > 0
+            ? `${ex.sets[0].weight || 0}kg x ${ex.sets[0].reps || 0}`
+            : '-',
+      })),
+    }
+    const blob = await generateWorkoutCard(cardData)
+    await shareWorkoutCard(blob, workout.value.name)
+  } catch (err) {
+    console.error('Failed to share:', err)
+  } finally {
+    sharing.value = false
+  }
+}
+
 // Repeat this workout with the same exercises
 function repeatWorkout() {
   if (!workout.value) return
@@ -369,6 +403,17 @@ function repeatWorkout() {
               </template>
               Repeat
             </NButton>
+            <NButton :loading="sharing" @click="shareWorkout">
+              <template #icon>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </template>
+              Share
+            </NButton>
+            <NuxtLink :to="`/workout/compare?a=${workoutId}`">
+              <NButton>Compare</NButton>
+            </NuxtLink>
             <NuxtLink :to="`/workout/${workoutId}/edit`">
               <NButton>
                 <template #icon>

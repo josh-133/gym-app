@@ -19,6 +19,7 @@ interface ActiveSet {
   reps: number | null
   weight_kg: number | null
   rpe: number | null
+  tempo: string | null
   set_type: 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
   completed_at: string | null
   is_pr: boolean
@@ -143,6 +144,9 @@ export const useWorkoutStore = defineStore('workout', {
         rating: null,
         perceived_exertion: null,
         calories_burned: null,
+        mood: null,
+        energy: null,
+        sleep_quality: null,
         created_at: new Date().toISOString(),
       }
       this.exerciseLogs = []
@@ -152,6 +156,43 @@ export const useWorkoutStore = defineStore('workout', {
       this.pausedAt = null
       this.totalPausedTime = 0
       this.restTimerEndAt = null
+      this.persistState()
+    },
+
+    // Start a workout pre-populated from a previous workout's data
+    startFromHistory(workout: {
+      name: string
+      exercises: {
+        exercise: Exercise
+        sets: { weight_kg: number | null; reps: number | null; set_type?: string }[]
+        group_id?: string | null
+        group_type?: ExerciseGroupType | null
+      }[]
+    }) {
+      this.startWorkout(workout.name)
+
+      for (const ex of workout.exercises) {
+        this.addExercise(ex.exercise, ex.group_id && ex.group_type ? {
+          groupId: ex.group_id,
+          groupType: ex.group_type,
+        } : undefined)
+
+        const exerciseIndex = this.exerciseLogs.length - 1
+
+        // Pre-populate sets from the historical workout
+        for (const set of ex.sets) {
+          this.addSet(exerciseIndex, (set.set_type as ActiveSet['set_type']) || 'working')
+          const setIndex = this.exerciseLogs[exerciseIndex].sets.length - 1
+          this.exerciseLogs[exerciseIndex].sets[setIndex].weight_kg = set.weight_kg
+          this.exerciseLogs[exerciseIndex].sets[setIndex].reps = set.reps
+        }
+
+        // If no sets from history, add one empty set
+        if (ex.sets.length === 0 && ex.exercise.category !== 'cardio') {
+          this.addSet(exerciseIndex)
+        }
+      }
+
       this.persistState()
     },
 
@@ -214,6 +255,7 @@ export const useWorkoutStore = defineStore('workout', {
         reps: lastSet?.reps ?? null,
         weight_kg: lastSet?.weight_kg ?? null,
         rpe: null,
+        tempo: null,
         set_type: setType,
         completed_at: null,
         is_pr: false,
@@ -238,6 +280,7 @@ export const useWorkoutStore = defineStore('workout', {
         reps: parentSet.reps ?? null,
         weight_kg: reducedWeight,
         rpe: null,
+        tempo: null,
         set_type: 'dropset',
         completed_at: null,
         is_pr: false,
@@ -410,6 +453,72 @@ export const useWorkoutStore = defineStore('workout', {
           l.group_type = null
         }
       })
+      this.persistState()
+    },
+
+    generateWarmupSets(exerciseIndex: number, targetWeight: number) {
+      const log = this.exerciseLogs[exerciseIndex]
+      if (!log) return
+
+      // Remove any existing warmup sets
+      log.sets = log.sets.filter(s => s.set_type !== 'warmup')
+
+      // Generate warm-up progression: bar → 50% → 70% → 85%
+      const barWeight = 20 // Standard barbell
+      const warmups: { weight: number; reps: number }[] = []
+
+      if (targetWeight > barWeight * 2) {
+        warmups.push({ weight: barWeight, reps: 10 })
+        warmups.push({ weight: Math.round(targetWeight * 0.5 / 2.5) * 2.5, reps: 8 })
+        warmups.push({ weight: Math.round(targetWeight * 0.7 / 2.5) * 2.5, reps: 5 })
+        warmups.push({ weight: Math.round(targetWeight * 0.85 / 2.5) * 2.5, reps: 3 })
+      } else if (targetWeight > barWeight) {
+        warmups.push({ weight: barWeight, reps: 10 })
+        warmups.push({ weight: Math.round(targetWeight * 0.7 / 2.5) * 2.5, reps: 5 })
+      } else {
+        warmups.push({ weight: Math.round(targetWeight * 0.5 / 2.5) * 2.5 || barWeight, reps: 10 })
+      }
+
+      // Insert warmup sets at the beginning
+      const warmupSets: ActiveSet[] = warmups.map((wu, idx) => ({
+        set_number: idx + 1,
+        reps: wu.reps,
+        weight_kg: wu.weight,
+        rpe: null,
+        set_type: 'warmup' as const,
+        completed_at: null,
+        is_pr: false,
+      }))
+
+      // Prepend warmup sets and renumber
+      log.sets = [...warmupSets, ...log.sets]
+      log.sets.forEach((set, i) => { set.set_number = i + 1 })
+
+      this.persistState()
+    },
+
+    swapExercise(exerciseIndex: number, newExercise: Exercise) {
+      const log = this.exerciseLogs[exerciseIndex]
+      if (!log) return
+
+      log.exercise = newExercise
+      // Keep existing sets but clear completed data
+      log.sets.forEach(set => {
+        set.completed_at = null
+        set.is_pr = false
+      })
+
+      // If swapping from strength to cardio or vice versa
+      if (newExercise.category === 'cardio' && !log.cardio_log) {
+        log.cardio_log = {}
+        log.sets = []
+      } else if (newExercise.category !== 'cardio' && log.cardio_log) {
+        log.cardio_log = null
+        if (log.sets.length === 0) {
+          this.addSet(exerciseIndex)
+        }
+      }
+
       this.persistState()
     },
 

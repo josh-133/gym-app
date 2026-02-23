@@ -1,3 +1,5 @@
+import { EXERCISE_LIBRARY } from '~/utils/exercises'
+
 interface CardioData {
   duration_sec: number
   distance_km?: number
@@ -19,6 +21,7 @@ interface SavedWorkout {
       completed: boolean
       set_type?: 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
       rpe?: number | null
+      tempo?: string | null
     }[]
     cardio?: CardioData
     group_id?: string | null
@@ -27,6 +30,10 @@ interface SavedWorkout {
   volume: number
   rating: number | null
   notes: string | null
+  mood?: number | null
+  energy?: number | null
+  sleep_quality?: number | null
+  calories_burned?: number | null
 }
 
 interface PersonalRecord {
@@ -42,9 +49,12 @@ const STORAGE_KEY = 'gym-app-workout-history'
 const WEEKLY_GOAL_KEY = 'gym-app-weekly-goal'
 
 export function useWorkoutHistory() {
+  const { $supabase } = useNuxtApp()
+  const auth = useAuth()
   const workouts = useState<SavedWorkout[]>('workoutHistory', () => [])
+  const supabaseLoaded = useState('workoutHistorySupabaseLoaded', () => false)
 
-  // Load workouts from localStorage on initialization
+  // Load workouts from localStorage first, then sync from Supabase
   function loadWorkouts() {
     if (import.meta.client) {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -59,23 +69,260 @@ export function useWorkoutHistory() {
     }
   }
 
-  // Save workouts to localStorage
-  function saveWorkouts() {
+  // Load workouts from Supabase
+  async function loadFromSupabase() {
+    if (!$supabase || !auth.user.value || supabaseLoaded.value) return
+
+    try {
+      const { data: sessions, error } = await $supabase
+        .from('workout_sessions')
+        .select(`
+          id, name, status, started_at, completed_at, duration_sec,
+          notes, rating, perceived_exertion, calories_burned,
+          mood, energy, sleep_quality,
+          exercise_logs (
+            id, exercise_id, order_index, notes,
+            exercises:exercise_id ( id, name, category ),
+            sets ( id, set_number, set_type, reps, weight_kg, rpe, is_pr, completed_at, tempo ),
+            cardio_logs ( id, duration_sec, distance_km, calories_burned )
+          )
+        `)
+        .eq('user_id', auth.user.value.id)
+        .eq('status', 'completed')
+        .order('started_at', { ascending: false })
+
+      if (error) {
+        console.error('Error loading from Supabase:', error)
+        return
+      }
+
+      if (sessions && sessions.length > 0) {
+        const supabaseWorkouts: SavedWorkout[] = sessions.map((s: any) => {
+          const exerciseLogs = (s.exercise_logs || []).sort((a: any, b: any) => a.order_index - b.order_index)
+
+          return {
+            id: s.id,
+            name: s.name,
+            date: s.started_at,
+            duration: s.duration_sec || 0,
+            exercises: exerciseLogs.map((log: any) => {
+              const exercise = log.exercises
+              const sets = (log.sets || []).sort((a: any, b: any) => a.set_number - b.set_number)
+              const cardioLogs = log.cardio_logs || []
+
+              return {
+                name: exercise?.name || 'Unknown',
+                category: exercise?.category || 'strength',
+                sets: sets.map((set: any) => ({
+                  weight: set.weight_kg,
+                  reps: set.reps,
+                  completed: !!set.completed_at,
+                  set_type: set.set_type || 'working',
+                  rpe: set.rpe,
+                  tempo: set.tempo || null,
+                })),
+                cardio: cardioLogs.length > 0 ? {
+                  duration_sec: cardioLogs[0].duration_sec,
+                  distance_km: cardioLogs[0].distance_km,
+                  calories: cardioLogs[0].calories_burned,
+                  completed: true,
+                } : undefined,
+              }
+            }),
+            volume: exerciseLogs.reduce((sum: number, log: any) => {
+              return sum + (log.sets || []).reduce((setSum: number, set: any) => {
+                if (set.completed_at && set.reps && set.weight_kg) {
+                  return setSum + (set.reps * set.weight_kg)
+                }
+                return setSum
+              }, 0)
+            }, 0),
+            rating: s.rating,
+            notes: s.notes,
+            mood: s.mood,
+            energy: s.energy,
+            sleep_quality: s.sleep_quality,
+            calories_burned: s.calories_burned,
+          }
+        })
+
+        // Merge: Supabase is source of truth, but keep any localStorage-only workouts
+        const supabaseIds = new Set(supabaseWorkouts.map(w => w.id))
+        const localOnly = workouts.value.filter(w => !supabaseIds.has(w.id))
+
+        workouts.value = [...supabaseWorkouts, ...localOnly]
+        saveToLocalStorage()
+
+        // Sync localStorage-only workouts to Supabase
+        if (localOnly.length > 0) {
+          syncLocalWorkoutsToSupabase(localOnly)
+        }
+      }
+
+      supabaseLoaded.value = true
+    } catch (err) {
+      console.error('Error loading workouts from Supabase:', err)
+    }
+  }
+
+  // Sync localStorage-only workouts to Supabase (background)
+  async function syncLocalWorkoutsToSupabase(localWorkouts: SavedWorkout[]) {
+    if (!$supabase || !auth.user.value) return
+
+    for (const workout of localWorkouts) {
+      try {
+        await saveWorkoutToSupabase(workout)
+      } catch (err) {
+        console.error('Error syncing local workout:', workout.name, err)
+      }
+    }
+  }
+
+  // Save workout to Supabase
+  async function saveWorkoutToSupabase(workout: SavedWorkout) {
+    if (!$supabase || !auth.user.value) return
+
+    const userId = auth.user.value.id
+
+    // Build exercise name → id lookup
+    const { data: exercises } = await $supabase
+      .from('exercises')
+      .select('id, name')
+
+    const exerciseMap = new Map<string, string>()
+    if (exercises) {
+      exercises.forEach((ex: { id: string; name: string }) => exerciseMap.set(ex.name.toLowerCase(), ex.id))
+    }
+
+    async function getExerciseId(name: string, category: string = 'strength'): Promise<string | null> {
+      const key = name.toLowerCase()
+      if (exerciseMap.has(key)) return exerciseMap.get(key)!
+
+      // Try to find from EXERCISE_LIBRARY
+      const libraryEx = EXERCISE_LIBRARY.find(e => e.name.toLowerCase() === key)
+      if (libraryEx && exerciseMap.has(libraryEx.name.toLowerCase())) {
+        return exerciseMap.get(libraryEx.name.toLowerCase())!
+      }
+
+      // Create custom exercise
+      const { data, error } = await $supabase
+        .from('exercises')
+        .insert({
+          user_id: userId,
+          name,
+          category,
+          muscle_groups: libraryEx?.muscleGroups || [],
+          equipment: libraryEx?.equipment || [],
+          is_compound: libraryEx?.isCompound || false,
+          is_system: false,
+        })
+        .select('id')
+        .single()
+
+      if (error || !data) return null
+      exerciseMap.set(key, data.id)
+      return data.id
+    }
+
+    try {
+      // Insert session
+      const { data: session, error: sessionError } = await $supabase
+        .from('workout_sessions')
+        .insert({
+          id: workout.id,
+          user_id: userId,
+          name: workout.name,
+          status: 'completed',
+          started_at: workout.date,
+          completed_at: workout.date,
+          duration_sec: workout.duration,
+          notes: workout.notes,
+          rating: workout.rating,
+          calories_burned: workout.calories_burned || null,
+          mood: workout.mood || null,
+          energy: workout.energy || null,
+          sleep_quality: workout.sleep_quality || null,
+        })
+        .select('id')
+        .single()
+
+      if (sessionError) return // May already exist
+
+      // Insert exercise logs
+      for (let i = 0; i < workout.exercises.length; i++) {
+        const ex = workout.exercises[i]
+        const exerciseId = await getExerciseId(ex.name, ex.category || 'strength')
+        if (!exerciseId) continue
+
+        const { data: exerciseLog } = await $supabase
+          .from('exercise_logs')
+          .insert({
+            session_id: session.id,
+            exercise_id: exerciseId,
+            order_index: i,
+          })
+          .select('id')
+          .single()
+
+        if (!exerciseLog) continue
+
+        // Insert sets
+        if (ex.sets.length > 0) {
+          const setsToInsert = ex.sets.map((set, idx) => ({
+            exercise_log_id: exerciseLog.id,
+            set_number: idx + 1,
+            set_type: set.set_type || 'working',
+            reps: set.reps,
+            weight_kg: set.weight,
+            rpe: set.rpe || null,
+            is_pr: false,
+            completed_at: set.completed ? workout.date : null,
+            tempo: set.tempo || null,
+          }))
+
+          await $supabase.from('sets').insert(setsToInsert)
+        }
+
+        // Insert cardio log
+        if (ex.cardio?.completed) {
+          await $supabase.from('cardio_logs').insert({
+            exercise_log_id: exerciseLog.id,
+            duration_sec: ex.cardio.duration_sec,
+            distance_km: ex.cardio.distance_km || null,
+            calories_burned: ex.cardio.calories || null,
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Error saving workout to Supabase:', err)
+    }
+  }
+
+  // Save workouts to localStorage (write-through cache)
+  function saveToLocalStorage() {
     if (import.meta.client) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(workouts.value))
     }
   }
 
   // Add a completed workout
-  function addWorkout(workout: SavedWorkout) {
-    workouts.value.unshift(workout) // Add to beginning (most recent first)
-    saveWorkouts()
+  async function addWorkout(workout: SavedWorkout) {
+    workouts.value.unshift(workout)
+    saveToLocalStorage()
+
+    // Save to Supabase in background
+    saveWorkoutToSupabase(workout)
   }
 
   // Delete a workout
-  function deleteWorkout(id: string) {
+  async function deleteWorkout(id: string) {
     workouts.value = workouts.value.filter(w => w.id !== id)
-    saveWorkouts()
+    saveToLocalStorage()
+
+    // Delete from Supabase
+    if ($supabase && auth.user.value) {
+      await $supabase.from('workout_sessions').delete().eq('id', id)
+    }
   }
 
   // Get a specific workout by ID
@@ -84,20 +331,40 @@ export function useWorkoutHistory() {
   }
 
   // Update workout rating
-  function updateRating(id: string, rating: number) {
+  async function updateRating(id: string, rating: number) {
     const workout = workouts.value.find(w => w.id === id)
     if (workout) {
       workout.rating = rating
-      saveWorkouts()
+      saveToLocalStorage()
+
+      if ($supabase && auth.user.value) {
+        await $supabase.from('workout_sessions').update({ rating }).eq('id', id)
+      }
     }
   }
 
   // Update an entire workout
-  function updateWorkout(id: string, updates: Partial<Omit<SavedWorkout, 'id'>>) {
+  async function updateWorkout(id: string, updates: Partial<Omit<SavedWorkout, 'id'>>) {
     const index = workouts.value.findIndex(w => w.id === id)
     if (index !== -1) {
       workouts.value.splice(index, 1, { ...workouts.value[index], ...updates })
-      saveWorkouts()
+      saveToLocalStorage()
+
+      // Update Supabase
+      if ($supabase && auth.user.value) {
+        const supabaseUpdates: Record<string, any> = {}
+        if (updates.name !== undefined) supabaseUpdates.name = updates.name
+        if (updates.notes !== undefined) supabaseUpdates.notes = updates.notes
+        if (updates.rating !== undefined) supabaseUpdates.rating = updates.rating
+        if (updates.mood !== undefined) supabaseUpdates.mood = updates.mood
+        if (updates.energy !== undefined) supabaseUpdates.energy = updates.energy
+        if (updates.sleep_quality !== undefined) supabaseUpdates.sleep_quality = updates.sleep_quality
+
+        if (Object.keys(supabaseUpdates).length > 0) {
+          await $supabase.from('workout_sessions').update(supabaseUpdates).eq('id', id)
+        }
+      }
+
       return true
     }
     return false
@@ -128,11 +395,9 @@ export function useWorkoutHistory() {
   }
 
   // Calculate all personal records from workout history
-  // A PR is the best weight×reps combination for each exercise
   function calculateAllPRs(): PersonalRecord[] {
     const prMap = new Map<string, PersonalRecord>()
 
-    // Sort workouts by date (oldest first) so we track when PRs were set
     const sortedWorkouts = [...workouts.value].sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     )
@@ -144,11 +409,9 @@ export function useWorkoutHistory() {
             const key = exercise.name
             const existing = prMap.get(key)
 
-            // Calculate "strength score" (weight × reps) for comparison
             const newScore = set.weight * set.reps
             const existingScore = existing ? existing.weight * existing.reps : 0
 
-            // New PR if higher score, or same score but more weight (stronger lift)
             if (newScore > existingScore || (newScore === existingScore && set.weight > (existing?.weight || 0))) {
               prMap.set(key, {
                 id: `${workout.id}-${exercise.name}-${set.weight}-${set.reps}`,
@@ -167,40 +430,30 @@ export function useWorkoutHistory() {
     return Array.from(prMap.values())
   }
 
-  // Get PRs achieved in the current month
   function getPRsThisMonth(): PersonalRecord[] {
     const allPRs = calculateAllPRs()
     const now = new Date()
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-
     return allPRs.filter(pr => new Date(pr.date) >= startOfMonth)
   }
 
-  // Get PR for a specific exercise
   function getExercisePR(exerciseName: string): PersonalRecord | null {
     const allPRs = calculateAllPRs()
     return allPRs.find(pr => pr.exercise === exerciseName) || null
   }
 
-  // Get the last performed sets for an exercise (from the most recent workout containing it)
   function getLastPerformedSets(exerciseName: string): { weight: number | null; reps: number | null }[] {
-    // Find the most recent workout containing this exercise
     for (const workout of workouts.value) {
       const exercise = workout.exercises.find(e => e.name === exerciseName)
       if (exercise && exercise.sets.length > 0) {
-        // Return only completed sets with valid data
         return exercise.sets
           .filter(s => s.completed && (s.reps !== null || s.weight !== null))
-          .map(s => ({
-            weight: s.weight,
-            reps: s.reps,
-          }))
+          .map(s => ({ weight: s.weight, reps: s.reps }))
       }
     }
     return []
   }
 
-  // Get exercise history (all occurrences of an exercise across workouts)
   function getExerciseHistory(exerciseName: string): {
     date: string
     workoutId: string
@@ -217,7 +470,6 @@ export function useWorkoutHistory() {
         const completedSets = exercise.sets.filter(s => s.completed && s.weight && s.reps)
         const totalVolume = completedSets.reduce((sum, s) => sum + ((s.weight || 0) * (s.reps || 0)), 0)
 
-        // Find best set (highest weight × reps)
         let bestSet: { weight: number; reps: number } | null = null
         let bestScore = 0
         for (const set of completedSets) {
@@ -244,11 +496,9 @@ export function useWorkoutHistory() {
     return history
   }
 
-  // Calculate current day streak (consecutive days with workouts)
   function calculateDayStreak(): number {
     if (workouts.value.length === 0) return 0
 
-    // Get unique workout dates, sorted from most recent to oldest
     const workoutDates = [...new Set(
       workouts.value.map(w => {
         const date = new Date(w.date)
@@ -270,7 +520,6 @@ export function useWorkoutHistory() {
     const mostRecentWorkout = workoutDates[0]
     mostRecentWorkout.setHours(0, 0, 0, 0)
 
-    // Streak only counts if most recent workout is today or yesterday
     if (mostRecentWorkout.getTime() !== today.getTime() &&
         mostRecentWorkout.getTime() !== yesterday.getTime()) {
       return 0
@@ -298,7 +547,6 @@ export function useWorkoutHistory() {
     return streak
   }
 
-  // Get exercises that haven't progressed in the last N weeks
   function getStagnantExercises(weeksThreshold: number = 2): {
     exercise: string
     lastPR: { weight: number; reps: number; date: string } | null
@@ -310,7 +558,6 @@ export function useWorkoutHistory() {
     const thresholdMs = weeksThreshold * 7 * 24 * 60 * 60 * 1000
     const now = Date.now()
 
-    // Get all unique exercises performed
     const exerciseSet = new Set<string>()
     workouts.value.forEach(w => {
       w.exercises.forEach(e => exerciseSet.add(e.name))
@@ -318,8 +565,6 @@ export function useWorkoutHistory() {
 
     for (const exerciseName of exerciseSet) {
       const history = getExerciseHistory(exerciseName)
-
-      // Only consider exercises performed at least 3 times
       if (history.length < 3) continue
 
       const pr = allPRs.find(p => p.exercise === exerciseName)
@@ -328,23 +573,16 @@ export function useWorkoutHistory() {
       const prDate = new Date(pr.date).getTime()
       const daysSinceProgress = Math.floor((now - prDate) / (24 * 60 * 60 * 1000))
 
-      // Check if PR is older than threshold
       if ((now - prDate) > thresholdMs) {
-        // Check if they've done this exercise recently (within threshold)
         const recentPerformance = history.find(h => {
           const performedDate = new Date(h.date).getTime()
           return (now - performedDate) < thresholdMs
         })
 
-        // Only flag if they're still doing the exercise but not progressing
         if (recentPerformance) {
           stagnantExercises.push({
             exercise: exerciseName,
-            lastPR: {
-              weight: pr.weight,
-              reps: pr.reps,
-              date: pr.date,
-            },
+            lastPR: { weight: pr.weight, reps: pr.reps, date: pr.date },
             daysSinceProgress,
             timesPerformed: history.length,
           })
@@ -352,11 +590,9 @@ export function useWorkoutHistory() {
       }
     }
 
-    // Sort by days since progress (longest first)
     return stagnantExercises.sort((a, b) => b.daysSinceProgress - a.daysSinceProgress)
   }
 
-  // Get all workout dates for calendar visualization
   function getWorkoutDates(): { date: string; count: number }[] {
     const dateMap = new Map<string, number>()
 
@@ -370,7 +606,6 @@ export function useWorkoutHistory() {
       .sort((a, b) => a.date.localeCompare(b.date))
   }
 
-  // Analyze training load and recommend deload if needed
   function getDeloadRecommendation(): {
     shouldDeload: boolean
     reason: string
@@ -378,26 +613,20 @@ export function useWorkoutHistory() {
     avgWorkoutsPerWeek: number
     totalVolumeTrend: 'increasing' | 'stable' | 'decreasing'
   } | null {
-    if (workouts.value.length < 8) {
-      return null // Not enough data
-    }
+    if (workouts.value.length < 8) return null
 
     const now = Date.now()
     const fourWeeksAgo = now - (4 * 7 * 24 * 60 * 60 * 1000)
     const eightWeeksAgo = now - (8 * 7 * 24 * 60 * 60 * 1000)
 
-    // Get workouts from the last 4 weeks and the 4 weeks before that
     const recentWorkouts = workouts.value.filter(w => new Date(w.date).getTime() >= fourWeeksAgo)
     const previousWorkouts = workouts.value.filter(w => {
       const date = new Date(w.date).getTime()
       return date >= eightWeeksAgo && date < fourWeeksAgo
     })
 
-    if (recentWorkouts.length < 4 || previousWorkouts.length < 4) {
-      return null // Not enough consistent training
-    }
+    if (recentWorkouts.length < 4 || previousWorkouts.length < 4) return null
 
-    // Calculate metrics
     const recentVolume = recentWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0)
     const previousVolume = previousWorkouts.reduce((sum, w) => sum + (w.volume || 0), 0)
     const volumeChange = previousVolume > 0 ? ((recentVolume - previousVolume) / previousVolume) * 100 : 0
@@ -405,12 +634,10 @@ export function useWorkoutHistory() {
     const weeksOfTraining = Math.ceil((now - new Date(workouts.value[workouts.value.length - 1].date).getTime()) / (7 * 24 * 60 * 60 * 1000))
     const avgWorkoutsPerWeek = workouts.value.length / Math.max(weeksOfTraining, 1)
 
-    // Determine volume trend
     let totalVolumeTrend: 'increasing' | 'stable' | 'decreasing' = 'stable'
     if (volumeChange > 10) totalVolumeTrend = 'increasing'
     else if (volumeChange < -10) totalVolumeTrend = 'decreasing'
 
-    // Count consecutive weeks with 4+ workouts
     let consecutiveHighVolumeWeeks = 0
     for (let i = 0; i < 8; i++) {
       const weekStart = now - ((i + 1) * 7 * 24 * 60 * 60 * 1000)
@@ -426,10 +653,6 @@ export function useWorkoutHistory() {
       }
     }
 
-    // Recommend deload if:
-    // 1. Training consistently (4+ sessions/week) for 4+ weeks
-    // 2. Volume is decreasing (sign of fatigue)
-    // 3. No recent PRs (stagnation)
     const stagnantExercises = getStagnantExercises(2)
     const hasStagnation = stagnantExercises.length >= 3
 
@@ -455,7 +678,6 @@ export function useWorkoutHistory() {
     }
   }
 
-  // Get cardio exercise history
   function getCardioHistory(exerciseName: string): {
     date: string
     workoutId: string
@@ -488,7 +710,6 @@ export function useWorkoutHistory() {
     return history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }
 
-  // Get cardio totals for a given period (defaults to last 7 days)
   function getCardioTotals(days: number = 7): {
     totalDuration: number
     totalDistance: number
@@ -518,7 +739,6 @@ export function useWorkoutHistory() {
     return { totalDuration, totalDistance, totalCalories, sessionCount }
   }
 
-  // Get cardio personal bests
   function getCardioPRs(): {
     exercise: string
     bestDistance?: { value: number; date: string }
@@ -539,20 +759,17 @@ export function useWorkoutHistory() {
         const cardio = exercise.cardio
         const existing = prMap.get(exercise.name) || { exercise: exercise.name }
 
-        // Best distance
         if (cardio.distance_km) {
           if (!existing.bestDistance || cardio.distance_km > existing.bestDistance.value) {
             existing.bestDistance = { value: cardio.distance_km, date: workout.date }
           }
 
-          // Best pace (lowest is better)
           const pace = cardio.duration_sec / cardio.distance_km
           if (!existing.bestPace || pace < existing.bestPace.value) {
             existing.bestPace = { value: pace, date: workout.date }
           }
         }
 
-        // Best duration (longest)
         if (!existing.bestDuration || cardio.duration_sec > existing.bestDuration.value) {
           existing.bestDuration = { value: cardio.duration_sec, date: workout.date }
         }
@@ -565,9 +782,11 @@ export function useWorkoutHistory() {
   }
 
   // Initialize on mount
-  onMounted(() => {
+  onMounted(async () => {
     loadWorkouts()
     loadWeeklyGoal()
+    // Try to load from Supabase after initial localStorage load
+    await loadFromSupabase()
   })
 
   return {
@@ -578,26 +797,19 @@ export function useWorkoutHistory() {
     updateRating,
     updateWorkout,
     loadWorkouts,
-    // PR functions
+    loadFromSupabase,
     calculateAllPRs,
     getPRsThisMonth,
     getExercisePR,
-    // Exercise history
     getLastPerformedSets,
     getExerciseHistory,
-    // Streak
     calculateDayStreak,
-    // Progressive overload
     getStagnantExercises,
-    // Calendar data
     getWorkoutDates,
-    // Deload recommendation
     getDeloadRecommendation,
-    // Weekly goal
     weeklyGoalTarget: readonly(weeklyGoalTarget),
     setWeeklyGoalTarget,
     loadWeeklyGoal,
-    // Cardio functions
     getCardioHistory,
     getCardioTotals,
     getCardioPRs,

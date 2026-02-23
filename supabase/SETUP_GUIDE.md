@@ -48,8 +48,6 @@ NUXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1...
 # Optional: For server-side operations
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1...
 
-# Optional: For AI insights
-ANTHROPIC_API_KEY=sk-ant-...
 ```
 
 ## Step 4: Verify Setup
@@ -93,5 +91,4 @@ personal_records  - PRs by exercise
 achievements      - Badge definitions
 user_achievements - Unlocked badges
 body_measurements - Weight/composition tracking
-ai_insights       - AI-generated recommendations
 ```

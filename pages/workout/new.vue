@@ -31,6 +31,18 @@ const manualDurationMinutes = ref(30)
 const saveAsTemplate = ref(false)
 const templateName = ref('')
 
+// Mood/energy/sleep tracking for workout completion
+const workoutMood = ref<number | null>(null)
+const workoutEnergy = ref<number | null>(null)
+const workoutSleep = ref<number | null>(null)
+const moodOptions = [
+  { value: 1, emoji: '😫', label: 'Terrible' },
+  { value: 2, emoji: '😕', label: 'Bad' },
+  { value: 3, emoji: '😐', label: 'Okay' },
+  { value: 4, emoji: '🙂', label: 'Good' },
+  { value: 5, emoji: '😄', label: 'Great' },
+]
+
 // Transform saved templates to the format expected by the UI
 const templates = computed(() => {
   return savedTemplates.value.map(t => ({
@@ -255,6 +267,7 @@ async function confirmFinishWorkout() {
           completed: !!set.completed_at,
           set_type: set.set_type,
           rpe: set.rpe,
+          tempo: set.tempo || null,
         })),
         cardio: log.cardio_log ? {
           duration_sec: log.cardio_log.duration_sec || 0,
@@ -268,6 +281,9 @@ async function confirmFinishWorkout() {
       volume,
       rating: null,
       notes: result.session.notes,
+      mood: workoutMood.value,
+      energy: workoutEnergy.value,
+      sleep_quality: workoutSleep.value,
     })
 
     // Save as template if enabled
@@ -851,6 +867,32 @@ onMounted(() => {
             <p class="text-lg font-bold text-gray-900 dark:text-white">
               {{ workoutStore.exerciseLogs.reduce((sum, log) => sum + log.sets.filter(s => s.completed_at).length, 0) }}
             </p>
+          </div>
+        </div>
+
+        <!-- Mood / Energy / Sleep -->
+        <div class="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+          <p class="text-sm font-medium text-gray-700 dark:text-gray-300">How did you feel?</p>
+          <div v-for="tracker in [
+            { label: 'Mood', model: workoutMood, setter: (v: number | null) => workoutMood = v },
+            { label: 'Energy', model: workoutEnergy, setter: (v: number | null) => workoutEnergy = v },
+            { label: 'Sleep', model: workoutSleep, setter: (v: number | null) => workoutSleep = v },
+          ]" :key="tracker.label" class="flex items-center gap-3">
+            <span class="text-xs text-gray-500 dark:text-gray-400 w-12">{{ tracker.label }}</span>
+            <div class="flex gap-1">
+              <button
+                v-for="opt in moodOptions"
+                :key="opt.value"
+                class="w-8 h-8 rounded-full flex items-center justify-center text-base transition-all"
+                :class="tracker.model === opt.value
+                  ? 'bg-primary-100 dark:bg-primary-900/40 ring-2 ring-primary-500 scale-110'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 opacity-50 hover:opacity-100'"
+                :title="opt.label"
+                @click="tracker.setter(tracker.model === opt.value ? null : opt.value)"
+              >
+                {{ opt.emoji }}
+              </button>
+            </div>
           </div>
         </div>
 

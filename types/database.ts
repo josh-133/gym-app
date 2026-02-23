@@ -8,7 +8,6 @@ export type SetType = 'warmup' | 'working' | 'dropset' | 'failure' | 'amrap'
 export type WorkoutStatus = 'in_progress' | 'completed' | 'cancelled'
 export type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say'
 export type RecordType = 'max_weight' | 'max_reps' | 'max_volume' | 'max_duration' | 'max_distance' | 'fastest_pace'
-export type InsightType = 'recommendation' | 'analysis' | 'warning' | 'celebration'
 export type ExerciseGroupType = 'superset' | 'circuit'
 export type AchievementCategory = 'consistency' | 'strength' | 'endurance' | 'milestone' | 'social'
 export type SubscriptionStatus = 'free' | 'premium' | 'cancelled' | 'past_due'
@@ -114,6 +113,7 @@ export interface WorkoutTemplate {
   target_muscle_groups: MuscleGroup[]
   difficulty: ExperienceLevel | null
   is_public: boolean
+  folder: string | null
   created_at: string
   updated_at: string
 }
@@ -129,6 +129,7 @@ export interface TemplateExercise {
   target_weight_kg: number | null
   target_duration_sec: number | null
   rest_sec: number
+  default_rest_sec: number | null
   notes: string | null
   exercise?: Exercise
 }
@@ -147,6 +148,9 @@ export interface WorkoutSession {
   rating: number | null
   perceived_exertion: number | null
   calories_burned: number | null
+  mood: number | null
+  energy: number | null
+  sleep_quality: number | null
   created_at: string
   exercise_logs?: ExerciseLog[]
 }
@@ -173,6 +177,7 @@ export interface Set {
   reps: number | null
   weight_kg: number | null
   rpe: number | null
+  tempo: string | null
   is_pr: boolean
   completed_at: string
   notes: string | null
@@ -246,20 +251,6 @@ export interface BodyMeasurement {
   notes: string | null
 }
 
-// AI insights
-export interface AIInsight {
-  id: string
-  user_id: string
-  insight_type: InsightType
-  title: string
-  content: string
-  related_exercise_id: string | null
-  is_read: boolean
-  is_dismissed: boolean
-  created_at: string
-  expires_at: string | null
-}
-
 // Computed types for UI
 export interface WorkoutStats {
   totalWorkouts: number
@@ -280,4 +271,155 @@ export interface ExerciseStats {
   totalVolume: number
   lastPerformed: string
   personalRecords: PersonalRecord[]
+}
+
+// Exercise notes (persistent per-exercise notes)
+export interface ExerciseNote {
+  id: string
+  user_id: string
+  exercise_id: string
+  note: string
+  preferred_rest_sec: number | null
+  updated_at: string
+}
+
+// Workout media
+export interface WorkoutMedia {
+  id: string
+  user_id: string
+  session_id: string
+  url: string
+  thumbnail_url: string | null
+  media_type: 'image' | 'video'
+  caption: string | null
+  created_at: string
+}
+
+// Progress photos
+export interface ProgressPhoto {
+  id: string
+  user_id: string
+  photo_url: string
+  thumbnail_url: string | null
+  category: 'front' | 'side' | 'back'
+  notes: string | null
+  taken_at: string
+  created_at: string
+}
+
+// Training programs
+export interface TrainingProgram {
+  id: string
+  user_id: string
+  name: string
+  description: string | null
+  duration_weeks: number
+  difficulty: ExperienceLevel | null
+  goal: string | null
+  is_public: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ProgramWeek {
+  id: string
+  program_id: string
+  week_number: number
+  name: string | null
+  notes: string | null
+  is_deload: boolean
+}
+
+export interface ProgramWorkout {
+  id: string
+  week_id: string
+  day_of_week: number
+  template_id: string | null
+  order_index: number
+}
+
+export interface UserActiveProgram {
+  id: string
+  user_id: string
+  program_id: string
+  started_at: string
+  current_week: number
+  current_workout_index: number
+}
+
+// Scheduled workouts
+export interface ScheduledWorkout {
+  id: string
+  user_id: string
+  template_id: string | null
+  program_workout_id: string | null
+  scheduled_date: string
+  reminder_at: string | null
+  completed_session_id: string | null
+  notes: string | null
+  created_at: string
+}
+
+// Social
+export interface Follow {
+  id: string
+  follower_id: string
+  following_id: string
+  created_at: string
+}
+
+export interface FeedItem {
+  id: string
+  user_id: string
+  item_type: 'workout' | 'pr' | 'achievement' | 'photo'
+  reference_id: string | null
+  created_at: string
+}
+
+export interface Like {
+  id: string
+  user_id: string
+  feed_item_id: string
+  created_at: string
+}
+
+export interface Comment {
+  id: string
+  user_id: string
+  feed_item_id: string
+  content: string
+  created_at: string
+}
+
+// Challenges
+export interface Challenge {
+  id: string
+  creator_id: string
+  name: string
+  description: string | null
+  challenge_type: 'volume' | 'frequency' | 'streak' | 'distance'
+  target_value: number
+  unit: string
+  start_date: string
+  end_date: string
+  is_public: boolean
+  created_at: string
+}
+
+export interface ChallengeParticipant {
+  id: string
+  challenge_id: string
+  user_id: string
+  current_value: number
+  joined_at: string
+  completed_at: string | null
+}
+
+// Device tokens for push notifications
+export interface DeviceToken {
+  id: string
+  user_id: string
+  token: string
+  platform: 'ios' | 'android' | 'web'
+  created_at: string
 }
