@@ -22,7 +22,7 @@ const calendarData = computed(() => {
     const date = new Date(startDate)
     date.setDate(startDate.getDate() + i)
 
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     const count = workoutMap.get(dateStr) || 0
     const isToday = date.getTime() === today.getTime()
 

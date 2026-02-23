@@ -604,7 +604,8 @@ export function useWorkoutHistory() {
     const dateMap = new Map<string, number>()
 
     workouts.value.forEach(w => {
-      const dateStr = new Date(w.date).toISOString().split('T')[0]
+      const d = new Date(w.date)
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       dateMap.set(dateStr, (dateMap.get(dateStr) || 0) + 1)
     })
 
