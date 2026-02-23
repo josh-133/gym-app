@@ -32,30 +32,33 @@ const muscleVolume = computed(() => {
   return volume
 })
 
-// Color intensity based on weekly sets
-function getColor(muscle: string): string {
+// Border accent color based on weekly sets
+function getBorderColor(muscle: string): string {
   const sets = muscleVolume.value.get(muscle) || 0
-  if (sets === 0) return '#e5e7eb' // gray-200
-  if (sets < 5) return '#fde68a'   // amber-200
-  if (sets < 10) return '#bbf7d0'  // green-200 (lighter, use dark text)
-  if (sets < 15) return '#16a34a'  // green-600 (darker, white text)
-  return '#15803d'                 // green-700 (darkest, white text)
+  if (sets === 0) return '#d1d5db' // gray-300
+  if (sets < 5) return '#f59e0b'   // amber-500
+  if (sets < 10) return '#22c55e'  // green-500
+  if (sets < 15) return '#16a34a'  // green-600
+  return '#15803d'                 // green-700
 }
 
-function getDarkColor(muscle: string): string {
+function getBorderDarkColor(muscle: string): string {
   const sets = muscleVolume.value.get(muscle) || 0
-  if (sets === 0) return '#374151' // gray-700
-  if (sets < 5) return '#92400e'   // amber-800
-  if (sets < 10) return '#166534'  // green-800
+  if (sets === 0) return '#4b5563' // gray-600
+  if (sets < 5) return '#d97706'   // amber-600
+  if (sets < 10) return '#16a34a'  // green-600
   if (sets < 15) return '#15803d'  // green-700
-  return '#16a34a'                 // green-600
+  return '#166534'                 // green-800
 }
 
-// Use dark text on light backgrounds, white text on dark backgrounds
-function getTextClass(muscle: string): string {
+// Number color matches the intensity — always readable on neutral card bg
+function getNumberColor(muscle: string): string {
   const sets = muscleVolume.value.get(muscle) || 0
-  if (sets >= 10) return 'text-white'        // dark green bg → white text
-  return 'text-gray-800 dark:text-gray-100'  // light bg → dark text
+  if (sets === 0) return 'text-gray-400 dark:text-gray-500'
+  if (sets < 5) return 'text-amber-600 dark:text-amber-400'
+  if (sets < 10) return 'text-green-600 dark:text-green-400'
+  if (sets < 15) return 'text-green-700 dark:text-green-400'
+  return 'text-green-800 dark:text-green-300'
 }
 
 function getSets(muscle: string): number {
@@ -90,19 +93,18 @@ const muscles = [
       <div
         v-for="muscle in muscles"
         :key="muscle.id"
-        class="rounded-lg p-3 text-center transition-all"
+        class="rounded-lg p-3 text-center transition-all bg-gray-50 dark:bg-gray-800/60 border-l-4"
         :style="{
-          backgroundColor: getColor(muscle.id),
+          borderLeftColor: getBorderColor(muscle.id),
         }"
-        :class="getSets(muscle.id) === 0 ? 'dark:!bg-gray-800' : ''"
       >
-        <p class="text-xs font-medium" :class="getTextClass(muscle.id)">
+        <p class="text-xs font-medium text-gray-600 dark:text-gray-400">
           {{ muscle.label }}
         </p>
-        <p class="text-lg font-bold" :class="getTextClass(muscle.id)">
+        <p class="text-lg font-bold" :class="getNumberColor(muscle.id)">
           {{ getSets(muscle.id) }}
         </p>
-        <p class="text-[10px] opacity-70" :class="getTextClass(muscle.id)">
+        <p class="text-[10px] text-gray-400 dark:text-gray-500">
           sets
         </p>
       </div>
@@ -111,15 +113,15 @@ const muscles = [
     <!-- Legend -->
     <div class="flex items-center justify-center gap-4 mt-4 text-xs text-gray-500 dark:text-gray-400">
       <div class="flex items-center gap-1">
-        <div class="w-3 h-3 rounded bg-gray-200 dark:bg-gray-700"></div>
+        <div class="w-3 h-3 rounded bg-gray-300 dark:bg-gray-600"></div>
         <span>0</span>
       </div>
       <div class="flex items-center gap-1">
-        <div class="w-3 h-3 rounded bg-amber-200"></div>
+        <div class="w-3 h-3 rounded bg-amber-500"></div>
         <span>1-4</span>
       </div>
       <div class="flex items-center gap-1">
-        <div class="w-3 h-3 rounded bg-green-200"></div>
+        <div class="w-3 h-3 rounded bg-green-500"></div>
         <span>5-9</span>
       </div>
       <div class="flex items-center gap-1">
