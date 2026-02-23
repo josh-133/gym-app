@@ -37,9 +37,9 @@ function getColor(muscle: string): string {
   const sets = muscleVolume.value.get(muscle) || 0
   if (sets === 0) return '#e5e7eb' // gray-200
   if (sets < 5) return '#fde68a'   // amber-200
-  if (sets < 10) return '#86efac'  // green-300
-  if (sets < 15) return '#4ade80'  // green-400
-  return '#22c55e'                 // green-500
+  if (sets < 10) return '#bbf7d0'  // green-200 (lighter, use dark text)
+  if (sets < 15) return '#16a34a'  // green-600 (darker, white text)
+  return '#15803d'                 // green-700 (darkest, white text)
 }
 
 function getDarkColor(muscle: string): string {
@@ -49,6 +49,13 @@ function getDarkColor(muscle: string): string {
   if (sets < 10) return '#166534'  // green-800
   if (sets < 15) return '#15803d'  // green-700
   return '#16a34a'                 // green-600
+}
+
+// Use dark text on light backgrounds, white text on dark backgrounds
+function getTextClass(muscle: string): string {
+  const sets = muscleVolume.value.get(muscle) || 0
+  if (sets >= 10) return 'text-white'        // dark green bg → white text
+  return 'text-gray-800 dark:text-gray-100'  // light bg → dark text
 }
 
 function getSets(muscle: string): number {
@@ -89,13 +96,13 @@ const muscles = [
         }"
         :class="getSets(muscle.id) === 0 ? 'dark:!bg-gray-800' : ''"
       >
-        <p class="text-xs font-medium" :class="getSets(muscle.id) > 5 ? 'text-white dark:text-white' : 'text-gray-700 dark:text-gray-300'">
+        <p class="text-xs font-medium" :class="getTextClass(muscle.id)">
           {{ muscle.label }}
         </p>
-        <p class="text-lg font-bold" :class="getSets(muscle.id) > 5 ? 'text-white dark:text-white' : 'text-gray-900 dark:text-white'">
+        <p class="text-lg font-bold" :class="getTextClass(muscle.id)">
           {{ getSets(muscle.id) }}
         </p>
-        <p class="text-[10px]" :class="getSets(muscle.id) > 5 ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'">
+        <p class="text-[10px] opacity-70" :class="getTextClass(muscle.id)">
           sets
         </p>
       </div>
@@ -112,15 +119,15 @@ const muscles = [
         <span>1-4</span>
       </div>
       <div class="flex items-center gap-1">
-        <div class="w-3 h-3 rounded bg-green-300"></div>
+        <div class="w-3 h-3 rounded bg-green-200"></div>
         <span>5-9</span>
       </div>
       <div class="flex items-center gap-1">
-        <div class="w-3 h-3 rounded bg-green-400"></div>
+        <div class="w-3 h-3 rounded bg-green-600"></div>
         <span>10-14</span>
       </div>
       <div class="flex items-center gap-1">
-        <div class="w-3 h-3 rounded bg-green-500"></div>
+        <div class="w-3 h-3 rounded bg-green-700"></div>
         <span>15+</span>
       </div>
     </div>
