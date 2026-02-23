@@ -557,6 +557,9 @@ export function useWorkoutHistory() {
     const stagnantExercises: ReturnType<typeof getStagnantExercises> = []
     const thresholdMs = weeksThreshold * 7 * 24 * 60 * 60 * 1000
     const now = Date.now()
+    // Exclude exercises trained in the last 3 days — they're not actionable
+    // until the next session for that muscle group
+    const recentCutoffMs = 3 * 24 * 60 * 60 * 1000
 
     const exerciseSet = new Set<string>()
     workouts.value.forEach(w => {
@@ -569,6 +572,10 @@ export function useWorkoutHistory() {
 
       const pr = allPRs.find(p => p.exercise === exerciseName)
       if (!pr) continue
+
+      // Skip exercises trained in the last 3 days — user just did them
+      const mostRecentDate = new Date(history[0].date).getTime()
+      if ((now - mostRecentDate) < recentCutoffMs) continue
 
       const prDate = new Date(pr.date).getTime()
       const daysSinceProgress = Math.floor((now - prDate) / (24 * 60 * 60 * 1000))
