@@ -109,24 +109,24 @@ const monthLabels = computed(() => {
     </div>
 
     <!-- Calendar Grid -->
-    <div class="flex gap-1">
+    <div class="flex gap-1.5">
       <!-- Day labels -->
-      <div class="flex flex-col gap-0.5 text-xs text-gray-400 dark:text-gray-500 pr-1">
-        <span class="h-3"></span>
-        <span class="h-3">M</span>
-        <span class="h-3"></span>
-        <span class="h-3">W</span>
-        <span class="h-3"></span>
-        <span class="h-3">F</span>
-        <span class="h-3"></span>
+      <div class="flex flex-col gap-1 text-xs text-gray-400 dark:text-gray-500 pr-1 justify-around">
+        <span class="h-4 leading-4"></span>
+        <span class="h-4 leading-4">M</span>
+        <span class="h-4 leading-4"></span>
+        <span class="h-4 leading-4">W</span>
+        <span class="h-4 leading-4"></span>
+        <span class="h-4 leading-4">F</span>
+        <span class="h-4 leading-4"></span>
       </div>
 
       <!-- Weeks -->
-      <div class="flex gap-0.5 overflow-x-auto">
+      <div class="flex gap-1 overflow-x-auto flex-1">
         <div
           v-for="(week, weekIdx) in calendarData"
           :key="weekIdx"
-          class="flex flex-col gap-0.5"
+          class="flex flex-col gap-1 flex-1"
         >
           <NTooltip
             v-for="day in week"
@@ -135,7 +135,7 @@ const monthLabels = computed(() => {
           >
             <template #trigger>
               <div
-                class="w-3 h-3 rounded-sm transition-colors cursor-pointer"
+                class="w-full aspect-square min-w-3 rounded-sm transition-colors cursor-pointer"
                 :class="[
                   getIntensityClass(day.count),
                   day.isToday ? 'ring-1 ring-indigo-500 ring-offset-1' : ''
@@ -154,12 +154,12 @@ const monthLabels = computed(() => {
     </div>
 
     <!-- Legend -->
-    <div class="flex items-center justify-end gap-2 mt-3 text-xs text-gray-500 dark:text-gray-400">
+    <div class="flex items-center justify-end gap-2 mt-4 text-xs text-gray-500 dark:text-gray-400">
       <span>Less</span>
-      <div class="w-3 h-3 rounded-sm bg-gray-100 dark:bg-gray-800"></div>
-      <div class="w-3 h-3 rounded-sm bg-green-200 dark:bg-green-900"></div>
-      <div class="w-3 h-3 rounded-sm bg-green-400 dark:bg-green-700"></div>
-      <div class="w-3 h-3 rounded-sm bg-green-600 dark:bg-green-500"></div>
+      <div class="w-3.5 h-3.5 rounded-sm bg-gray-100 dark:bg-gray-800"></div>
+      <div class="w-3.5 h-3.5 rounded-sm bg-green-200 dark:bg-green-900"></div>
+      <div class="w-3.5 h-3.5 rounded-sm bg-green-400 dark:bg-green-700"></div>
+      <div class="w-3.5 h-3.5 rounded-sm bg-green-600 dark:bg-green-500"></div>
       <span>More</span>
     </div>
   </NCard>
